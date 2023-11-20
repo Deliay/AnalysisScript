@@ -350,3 +350,5 @@ MigrationBackup/
 .ionide/
 
 .vscode
+
+deploy-tasks.json
