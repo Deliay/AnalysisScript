@@ -4,7 +4,8 @@
     {
         Equal = '=',
         Pipe = '|',
-        LineEnd = '\n',
+        Comment = '#',
+        NewLine = '\n',
         END = '\xFF',
         Param,
         Let,
@@ -12,5 +13,6 @@
         Identity,
         String,
         Number,
+        Return,
     }
 }

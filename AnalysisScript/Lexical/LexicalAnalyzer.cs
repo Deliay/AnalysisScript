@@ -1,6 +1,4 @@
-﻿using AnalysisScript.Lexical;
-
-namespace AnalysisScript
+﻿namespace AnalysisScript.Lexical
 {
     public static class LexicalAnalyzer
     {
@@ -57,6 +55,7 @@ namespace AnalysisScript
                     if (val == "let") yield return new Token.Let(pos);
                     else if (val == "param") yield return new Token.Param(pos);
                     else if (val == "ui") yield return new Token.Ui(pos);
+                    else if (val == "return") yield return new Token.Return(pos);
                     else yield return new Token.Identity(val, pos);
                 }
                 else if (IsQuote(current))
@@ -70,15 +69,28 @@ namespace AnalysisScript
                             else if (current == 't') val += '\t';
                             else if (current == 's') val += ' ';
                             else if (current == 'b') val += '\b';
-                            else throw new UnknownTokenException(pos, $"\\{current}");
+                            else throw new InvalidTokenException(pos, $"\\{current}");
                         }
                         else val += current;
                     }
                     yield return new Token.String(val, pos);
                 }
+                else if (current == '#')
+                {
+                    string val = "";
+                    while (HasMore() && Peek() != '\n')
+                    {
+                        val += current;
+                    }
+                    yield return new Token.Comment(val, pos);
+                    yield return new Token.NewLine();
+                }
+                else if (current == '\n') yield return new Token.NewLine(pos);
                 else if (char.IsWhiteSpace(current)) continue;
-                else throw new UnknownTokenException(pos, current.ToString());
+                else throw new InvalidTokenException(pos, current.ToString());
             } while (HasMore());
+
+            yield return new Token.NewLine(pos);
         }
     }
 }

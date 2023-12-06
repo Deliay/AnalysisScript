@@ -12,6 +12,10 @@
 
     public static class Token
     {
+        public record struct NewLine(int Pos) : IToken
+        {
+            public readonly TokenType Type => TokenType.NewLine;
+        }
         public record struct Equal(int Pos) : IToken
         {
             public readonly TokenType Type => TokenType.Equal;
@@ -31,6 +35,14 @@
         public record struct Param(int Pos) : IToken
         {
             public readonly TokenType Type => TokenType.Param;
+        }
+        public record struct Return(int Pos) : IToken
+        {
+            public readonly TokenType Type => TokenType.Return;
+        }
+        public record struct Comment(string Word, int Pos) : IWordToken
+        {
+            public readonly TokenType Type => TokenType.Comment;
         }
 
         public record struct Identity(string Word, int Pos) : IWordToken
