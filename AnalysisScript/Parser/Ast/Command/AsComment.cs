@@ -11,5 +11,9 @@ namespace AnalysisScript.Parser.Ast.Command
     {
         public string Content => LexicalToken.Word;
 
+        public override string ToString()
+        {
+            return $"#{Content}";
+        }
     }
 }

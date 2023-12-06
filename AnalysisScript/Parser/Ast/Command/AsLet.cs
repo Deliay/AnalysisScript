@@ -21,5 +21,10 @@ namespace AnalysisScript.Parser.Ast.Command
         public AsObject Arg => arg;
 
         public List<AsPipe> Pipes => pipes;
+
+        public override string ToString()
+        {
+            return $"let {Name} = {Arg} \n{string.Join('\n', Pipes)}";
+        }
     }
 }

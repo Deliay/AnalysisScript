@@ -11,9 +11,14 @@ namespace AnalysisScript.Parser.Ast.Command
 {
     public class AsUi(
         Token.Ui lexical,
-        IEnumerable<AsPipe> pipes)
+        List<AsPipe> pipes)
         : AsCommand<Token.Ui>(lexical, CommandType.Ui)
     {
-        public IEnumerable<AsPipe> Pipes => pipes;
+        public List<AsPipe> Pipes => pipes;
+
+        public override string ToString()
+        {
+            return $"ui\n{string.Join('\n', Pipes)}";
+        }
     }
 }

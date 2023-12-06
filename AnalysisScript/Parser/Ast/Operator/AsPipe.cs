@@ -12,5 +12,10 @@ namespace AnalysisScript.Parser.Ast.Operator
     {
         public AsIdentity FunctionName => fn;
         public List<AsObject> Arguments => args;
+
+        public override string ToString()
+        {
+            return $"| {FunctionName} {string.Join(' ', Arguments)}";
+        }
     }
 }

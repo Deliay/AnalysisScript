@@ -12,5 +12,10 @@ namespace AnalysisScript.Parser.Ast.Command
         : AsCommand<Token.Param>(lexicalToken, CommandType.Param)
     {
         public AsIdentity Variable => variable;
+
+        public override string ToString()
+        {
+            return $"param {Variable}";
+        }
     }
 }
