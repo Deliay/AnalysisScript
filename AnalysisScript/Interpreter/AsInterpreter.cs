@@ -6,7 +6,7 @@ using AnalysisScript.Parser.Ast.Operator;
 
 namespace AnalysisScript.Interpreter;
 
-public class AsInterpreter
+public class AsInterpreter : IDisposable
 {
     private Dictionary<string, object> Variables { get; } = [];
     private Dictionary<string, Func<AsExecutionContext, object, object[], ValueTask<object>>> Methods { get; } = [];
@@ -185,11 +185,17 @@ public class AsInterpreter
             {
                 await RunCommand(cmd, token);
             }
-            catch (Exception ex)
+            catch (Exception ex) 
             {
                 throw new AsRuntimeException(cmd, ex);
             }
         }
     }
 
+    public void Dispose()
+    {
+        OnCommandUpdate = null;
+        OnCommentUpdate = null;
+        OnLogging = null;
+    }
 }

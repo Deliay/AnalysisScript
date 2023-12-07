@@ -60,6 +60,23 @@ public static class BasicFunction
             return ValueTask.FromResult<object>(objects.Cast<object>().Where(obj => GetValue(obj, proeprty)?.ToString()?.Contains(value) ?? false));
         }
     }
+    public static ValueTask<object> FilterNotContains(AsExecutionContext ctx, object values, object[] @params)
+    {
+        Assert.Count(1, @params);
+        if (@params.Length == 1)
+        {
+            Assert.IsSeq<string>(values, out var strings);
+            return ValueTask.FromResult<object>(strings.Where(str => !str.Contains(@params[0].ToString())));
+        }
+        else
+        {
+            var proeprty = @params[0].ToString();
+            var value = @params[1].ToString();
+            
+            Assert.IsSeq(values, out var objects);
+            return ValueTask.FromResult<object>(objects.Cast<object>().Where(obj => !(GetValue(obj, proeprty)?.ToString()?.Contains(value) ?? false)));
+        }
+    }
     public static ValueTask<object> FilterRegex(AsExecutionContext ctx, object values, object[] @params)
     {
         Assert.Count(1, @params);
@@ -84,7 +101,7 @@ public static class BasicFunction
     {
         if (@params.Length == 0)
         {
-            Assert.Is<IEnumerable<string>>(values, out var strings);
+            Assert.Is<IEnumerable<object>>(values, out var strings);
             return ValueTask.FromResult<object>(strings.ToHashSet());
         }
         
@@ -116,6 +133,7 @@ public static class BasicFunction
     public static AsInterpreter RegisterBasicFunctions(this AsInterpreter interpreter)
     {
         interpreter.RegisterFunction("filter_contains", FilterContains);
+        interpreter.RegisterFunction("filter_not_contains", FilterNotContains);
         interpreter.RegisterFunction("filter_regex", FilterRegex);
         interpreter.RegisterFunction("group", Group);
         interpreter.RegisterFunction("select", Select);

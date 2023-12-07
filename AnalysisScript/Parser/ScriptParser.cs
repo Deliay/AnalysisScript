@@ -164,7 +164,7 @@ namespace AnalysisScript.Parser
 
         private static IEnumerable<AsCommand> ReadCommands(IEnumerator<IToken> reader)
         {
-            reader.MoveNextAndRequire(TokenType.Let, TokenType.Comment, TokenType.Ui, TokenType.NewLine);
+            reader.MoveNextAndRequire(TokenType.Let, TokenType.Comment, TokenType.Ui, TokenType.NewLine, TokenType.Return, TokenType.Param);
             while (true)
             {
                 if (reader.Current.Type == TokenType.Let) yield return ReadLet(reader);
@@ -173,7 +173,7 @@ namespace AnalysisScript.Parser
                 else if (reader.Current.Type == TokenType.NewLine) { if (!reader.MoveNext()) break; }
                 else if (reader.Current.Type == TokenType.Return) yield return reader.ReadReturn();
                 else if (reader.Current.Type == TokenType.Param) yield return reader.ReadParam();
-                else throw new InvalidGrammarException(reader.Current, TokenType.Let, TokenType.Comment, TokenType.Ui, TokenType.NewLine);
+                else throw new InvalidGrammarException(reader.Current, TokenType.Let, TokenType.Comment, TokenType.Ui, TokenType.NewLine, TokenType.Return, TokenType.Param);
             }
         }
 
