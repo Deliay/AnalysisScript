@@ -8,10 +8,14 @@ namespace AnalysisScript.Interpreter;
 public class AsInterpreter
 {
     private Dictionary<string, object> Variables { get; } = [];
-    private Dictionary<AsIdentity, Func<object, object[], ValueTask<object>>> Methods { get; } = [];
+    private Dictionary<string, Func<object, object[], ValueTask<object>>> Methods { get; } = [];
     public object? Return { get; private set; }
     public string LastComment { get; private set; }
     public string CurrentCommand { get; private set; }
+
+    public event Action<string> OnCommentUpdate;
+
+    public event Action<string> OnCommandUpdate;
     
     private bool HasVariable(AsIdentity id) => Variables.ContainsKey(id.Name);
 
@@ -47,6 +51,7 @@ public class AsInterpreter
             slices.Add(value?.ToString() ?? "(null)");
             pos = right + 1;
             left = currentStr.IndexOf("${", pos);
+            if (left == -1) break;
             right = currentStr.IndexOf('}', left);
         }
         slices.Add(currentStr[pos..]);
@@ -69,7 +74,7 @@ public class AsInterpreter
         var value = initialValue;
         foreach (var pipe in pipes)
         {
-            var func = Methods[pipe.FunctionName];
+            var func = Methods[pipe.FunctionName.Name];
             var args = pipe.Arguments.Select(ValueOf).ToArray();
             value = await func(value, args);
         }
@@ -91,6 +96,7 @@ public class AsInterpreter
     private ValueTask ExecuteComment(AsComment comment)
     {
         LastComment = comment.Content;
+        OnCommentUpdate?.Invoke(LastComment);
         return ValueTask.CompletedTask;
     }
 
@@ -106,9 +112,25 @@ public class AsInterpreter
         return ValueTask.CompletedTask;
     }
 
+    public AsInterpreter RegisterFunction(string name, Func<object, object[], ValueTask<object>> func)
+    {
+        Methods.Add(name, func);
+        return this;
+    }
+
+    public AsInterpreter AddVariable(string name, string value)
+    {
+        Variables.Add(name, value);
+        return this;
+    }
+    
+
     public async ValueTask Run(AsAnalysis tree, CancellationToken token) {
         foreach (var cmd in tree.Commands)
         {
+            CurrentCommand = cmd?.ToString()!;
+            OnCommandUpdate?.Invoke(CurrentCommand);
+
             if (cmd.Type == CommandType.Comment && cmd is AsComment comment)
             {
                 await ExecuteComment(comment);
