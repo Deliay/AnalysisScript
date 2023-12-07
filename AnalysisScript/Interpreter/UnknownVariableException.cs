@@ -1,7 +1,7 @@
 ﻿using AnalysisScript.Lexical;
 using AnalysisScript.Parser.Ast.Basic;
 
-namespace AnalysisScript;
+namespace AnalysisScript.Interpreter;
 
 public class UnknownVariableException(IWordToken identity)
     : Exception($"Unknown variable {identity.Word} at pos {identity.Pos}")

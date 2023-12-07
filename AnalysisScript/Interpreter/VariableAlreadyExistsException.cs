@@ -1,7 +1,7 @@
 ﻿using AnalysisScript.Lexical;
 using AnalysisScript.Parser.Ast.Basic;
 
-namespace AnalysisScript;
+namespace AnalysisScript.Interpreter;
 
 public class VariableAlreadyExistsException(AsIdentity identity)
     : Exception($"variable {identity.Name} at pos {identity.LexicalToken.Pos} already defined")
