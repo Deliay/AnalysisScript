@@ -15,5 +15,18 @@ namespace AnalysisScript.Parser.Ast.Basic
         {
             return Name;
         }
+
+        public override int GetHashCode()
+        {
+            return Name.GetHashCode();
+        }
+
+        public override bool Equals(object? obj)
+        {
+            if (obj is AsIdentity target)
+                return target.Name == Name;
+            else 
+                return base.Equals(obj);
+        }
     }
 }
