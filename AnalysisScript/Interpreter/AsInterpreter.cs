@@ -1,3 +1,4 @@
+using AnalysisScript.Library;
 using AnalysisScript.Parser.Ast;
 using AnalysisScript.Parser.Ast.Basic;
 using AnalysisScript.Parser.Ast.Command;
@@ -124,6 +125,17 @@ public class AsInterpreter
         return this;
     }
     
+    public async ValueTask<T?> RunAndReturn<T>(AsAnalysis tree, CancellationToken token)
+    {
+        await Run(tree, token);
+        if (Return is not null)
+        {
+            Assert.Is<T>(Return, out var result);
+            return result;
+        }
+
+        return default;
+    }
 
     public async ValueTask Run(AsAnalysis tree, CancellationToken token) {
         foreach (var cmd in tree.Commands)
