@@ -15,6 +15,7 @@ public static class Assert
         if (src is T convert)
         {
             target = convert;
+            return;
         }
 
         throw new InvalidOperationException($"Require {typeof(T).Name} but passed {src.GetType().Name}");

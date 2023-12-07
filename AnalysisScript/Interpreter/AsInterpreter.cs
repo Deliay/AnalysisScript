@@ -118,7 +118,7 @@ public class AsInterpreter
         return this;
     }
 
-    public AsInterpreter AddVariable(string name, string value)
+    public AsInterpreter AddVariable(string name, object value)
     {
         Variables.Add(name, value);
         return this;
