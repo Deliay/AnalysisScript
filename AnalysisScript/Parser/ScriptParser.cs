@@ -85,7 +85,7 @@ namespace AnalysisScript.Parser
                 var identity = reader.NextAndReadIdentity();
                 var arguments = reader.ReadArguments().ToList();
                 yield return new AsPipe((Token.Pipe)lex, identity, arguments);
-                reader.RequireAndMoveNext(TokenType.NewLine);
+                reader.RequireAndMoveNext(TokenType.NewLine, TokenType.Comment);
             }
         }
 
