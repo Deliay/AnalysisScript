@@ -9,15 +9,28 @@ namespace AnalysisScript.Interpreter;
 public class AsInterpreter
 {
     private Dictionary<string, object> Variables { get; } = [];
-    private Dictionary<string, Func<object, object[], ValueTask<object>>> Methods { get; } = [];
+    private Dictionary<string, Func<AsExecutionContext, object, object[], ValueTask<object>>> Methods { get; } = [];
     public object? Return { get; private set; }
-    public string LastComment { get; private set; }
-    public string CurrentCommand { get; private set; }
+    public string LastComment { get; private set; } = "";
+    public string CurrentCommand { get; private set; } = "";
+    public AsExecutionContext Context { get; private set; }
 
-    public event Action<string> OnCommentUpdate;
+    public event Action<string>? OnCommentUpdate;
 
-    public event Action<string> OnCommandUpdate;
-    
+    public event Action<string>? OnCommandUpdate;
+
+    public event Action<string>? OnLogging;
+
+    public AsInterpreter()
+    {
+        this.Context = new AsExecutionContext(Logging);
+    }
+
+    private void Logging(string message)
+    {
+        OnLogging?.Invoke(message);
+    }
+
     private bool HasVariable(AsIdentity id) => Variables.ContainsKey(id.Name);
 
     private object GetVariable(AsIdentity id)
@@ -77,7 +90,7 @@ public class AsInterpreter
         {
             var func = Methods[pipe.FunctionName.Name];
             var args = pipe.Arguments.Select(ValueOf).ToArray();
-            value = await func(value, args);
+            value = await func(Context, value, args);
         }
 
         return value;
@@ -113,7 +126,7 @@ public class AsInterpreter
         return ValueTask.CompletedTask;
     }
 
-    public AsInterpreter RegisterFunction(string name, Func<object, object[], ValueTask<object>> func)
+    public AsInterpreter RegisterFunction(string name, Func<AsExecutionContext, object, object[], ValueTask<object>> func)
     {
         Methods.Add(name, func);
         return this;
@@ -137,33 +150,45 @@ public class AsInterpreter
         return default;
     }
 
-    public async ValueTask Run(AsAnalysis tree, CancellationToken token) {
+    private async ValueTask RunCommand(AsCommand cmd, CancellationToken token = default)
+    {
+        CurrentCommand = cmd?.ToString()!;
+        OnCommandUpdate?.Invoke(CurrentCommand);
+
+        if (cmd.Type == CommandType.Comment && cmd is AsComment comment)
+        {
+            await ExecuteComment(comment);
+        }
+        else if (cmd.Type == CommandType.Let && cmd is AsLet let)
+        {
+            await ExecuteLet(let);
+        }
+        else if (cmd.Type == CommandType.Ui && cmd is AsUi ui)
+        {
+            await ExecuteUi(ui);
+        }
+        else if (cmd.Type == CommandType.Return && cmd is AsReturn @return)
+        {
+            await ExecuteReturn(@return);
+        }
+        else if (cmd.Type == CommandType.Param && cmd is AsParam param)
+        {
+            await ExecuteParam(param);
+        }
+        else throw new UnknownCommandException(cmd);
+    }
+
+    public async ValueTask Run(AsAnalysis tree, CancellationToken token = default) {
         foreach (var cmd in tree.Commands)
         {
-            CurrentCommand = cmd?.ToString()!;
-            OnCommandUpdate?.Invoke(CurrentCommand);
-
-            if (cmd.Type == CommandType.Comment && cmd is AsComment comment)
+            try
             {
-                await ExecuteComment(comment);
+                await RunCommand(cmd, token);
             }
-            else if (cmd.Type == CommandType.Let && cmd is AsLet let)
+            catch (Exception ex)
             {
-                await ExecuteLet(let);
+                throw new AsRuntimeException(cmd, ex);
             }
-            else if (cmd.Type == CommandType.Ui && cmd is AsUi ui)
-            {
-                await ExecuteUi(ui);
-            }
-            else if (cmd.Type == CommandType.Return && cmd is AsReturn @return)
-            {
-                await ExecuteReturn(@return);
-            }
-            else if (cmd.Type == CommandType.Param && cmd is AsParam param)
-            {
-                await ExecuteParam(param);
-            }
-            else throw new UnknownCommandException(cmd);
         }
     }
 

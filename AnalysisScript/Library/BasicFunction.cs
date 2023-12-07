@@ -43,7 +43,7 @@ public static class BasicFunction
 
         return cached(obj);
     }
-    public static ValueTask<object> FilterContains(object values, object[] @params)
+    public static ValueTask<object> FilterContains(AsExecutionContext ctx, object values, object[] @params)
     {
         Assert.Count(1, @params);
         if (@params.Length == 1)
@@ -60,7 +60,7 @@ public static class BasicFunction
             return ValueTask.FromResult<object>(objects.Cast<object>().Where(obj => GetValue(obj, proeprty)?.ToString()?.Contains(value) ?? false));
         }
     }
-    public static ValueTask<object> FilterRegex(object values, object[] @params)
+    public static ValueTask<object> FilterRegex(AsExecutionContext ctx, object values, object[] @params)
     {
         Assert.Count(1, @params);
         if (@params.Length == 1)
@@ -80,7 +80,7 @@ public static class BasicFunction
         }
     }
 
-    public static ValueTask<object> Group(object values, object[] @params)
+    public static ValueTask<object> Group(AsExecutionContext ctx, object values, object[] @params)
     {
         if (@params.Length == 0)
         {
@@ -93,7 +93,7 @@ public static class BasicFunction
         return ValueTask.FromResult<object>(objects.Cast<object>().GroupBy(k => GetValue(k, property)));
     }
 
-    public static ValueTask<object> Select(object values, object[] @params)
+    public static ValueTask<object> Select(AsExecutionContext ctx, object values, object[] @params)
     {
         Assert.Count(1, @params);
         
@@ -103,7 +103,7 @@ public static class BasicFunction
         return ValueTask.FromResult<object>(objects.Cast<object>().Select(obj => GetValue(obj, property)));
     }
 
-    public static ValueTask<object> Join(object values, object[] @params)
+    public static ValueTask<object> Join(AsExecutionContext ctx, object values, object[] @params)
     {
         Assert.Count(1, @params);
 
