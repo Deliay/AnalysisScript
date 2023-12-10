@@ -132,12 +132,12 @@ public static class BasicFunction
 
     public static AsInterpreter RegisterBasicFunctions(this AsInterpreter interpreter)
     {
-        interpreter.RegisterFunction("filter_contains", FilterContains);
-        interpreter.RegisterFunction("filter_not_contains", FilterNotContains);
-        interpreter.RegisterFunction("filter_regex", FilterRegex);
-        interpreter.RegisterFunction("group", Group);
-        interpreter.RegisterFunction("select", Select);
-        interpreter.RegisterFunction("join", Join);
+        //interpreter.RegisterFunction("box_filter_contains", FilterContains);
+        //interpreter.RegisterFunction("box_filter_not_contains", FilterNotContains);
+        //interpreter.RegisterFunction("box_filter_regex", FilterRegex);
+        //interpreter.RegisterFunction("box_group", Group);
+        //interpreter.RegisterFunction("box_select", Select);
+        //interpreter.RegisterFunction("box_join", Join);
         return interpreter;
     }
 }

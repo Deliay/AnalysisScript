@@ -6,6 +6,7 @@ using AnalysisScript.Parser.Ast.Operator;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -200,7 +201,18 @@ namespace AnalysisScript.Parser
             List<AsCommand> commands = ReadCommands(reader).ToList();
 
             if (commands == null) return null;
-            else return new AsAnalysis(commands);
+
+            //var constants = tokens.Where(token => token.IsConstant)
+            //    .GroupBy(token => token.Type)
+            //    .ToDictionary(group => group.Key, group => group);
+
+            //constants.TryGetValue(TokenType.String, out var stringConstantEnumerable);
+            //constants.TryGetValue(TokenType.Number, out var numberConstantEnumerable);
+
+            //var stringConstant = (stringConstantEnumerable ?? Enumerable.Empty<IToken>()).Cast<Token.String>().ToList();
+            //var numberConstant = (numberConstantEnumerable ?? Enumerable.Empty<IToken>()).Cast<Token.Number>().ToList();
+
+            return new AsAnalysis(commands); //, stringConstant, numberConstant);
         }
     }
 }

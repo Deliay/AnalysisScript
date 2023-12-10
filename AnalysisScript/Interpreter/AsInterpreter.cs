@@ -1,15 +1,17 @@
+using AnalysisScript.Interpreter.Variables;
 using AnalysisScript.Library;
 using AnalysisScript.Parser.Ast;
 using AnalysisScript.Parser.Ast.Basic;
 using AnalysisScript.Parser.Ast.Command;
 using AnalysisScript.Parser.Ast.Operator;
+using System.Linq.Expressions;
+using System.Reflection;
 
 namespace AnalysisScript.Interpreter;
 
 public class AsInterpreter : IDisposable
 {
-    private Dictionary<string, object> Variables { get; } = [];
-    private Dictionary<string, Func<AsExecutionContext, object, object[], ValueTask<object>>> Methods { get; } = [];
+    private VariableContext Variables { get; } = new();
     public object? Return { get; private set; }
     public string LastComment { get; private set; } = "";
     public string CurrentCommand { get; private set; } = "";
@@ -31,66 +33,21 @@ public class AsInterpreter : IDisposable
         OnLogging?.Invoke(message);
     }
 
-    private bool HasVariable(AsIdentity id) => Variables.ContainsKey(id.Name);
-
-    private object GetVariable(AsIdentity id)
-    {
-        if (Variables.TryGetValue(id.Name, out var value)) return value;
-        throw new UnknownVariableException(id);
-    }
-
-    private void PutVariable(AsIdentity id, object value)
-    {
-        if (Variables.ContainsKey(id.Name)) 
-            throw new VariableAlreadyExistsException(id);
-
-        Variables.Add(id.Name, value);
-    }
-
-    private string ParseString(AsString str)
-    {
-        var currentStr = str.RawContent;
-        List<string> slices = [];
-        int pos = 0;
-        int left = currentStr.IndexOf("${");
-        int right = currentStr.IndexOf('}');
-
-        while (left > -1 && right > -1)
-        {
-            var varName = currentStr[(left + 2)..right];
-            if (!Variables.TryGetValue(varName, out var value))
-                throw new UnknownVariableException(str.LexicalToken);
-
-            slices.Add(currentStr[pos..left]);
-            slices.Add(value?.ToString() ?? "(null)");
-            pos = right + 1;
-            left = currentStr.IndexOf("${", pos);
-            if (left == -1) break;
-            right = currentStr.IndexOf('}', left);
-        }
-        slices.Add(currentStr[pos..]);
-
-        return string.Join("", slices);
-    }
-
-    private object ValueOf(AsObject @object)
-    {
-        if (@object is AsString str) return ParseString(str);
-        else if (@object is AsNumber num) return num.Real;
-        else if (@object is AsIdentity id) return GetVariable(id);
-        throw new UnknownValueObjectException(@object);
-    }
-
-    private async ValueTask<object> RunPipe(List<AsPipe> pipes, object initialValue)
+    private async ValueTask<object> RunPipe(List<AsPipe> pipes, MethodCallExpression initialValue)
     {
         if (pipes.Count == 0) return initialValue;
 
         var value = initialValue;
         foreach (var pipe in pipes)
         {
-            var func = Methods[pipe.FunctionName.Name];
-            var args = pipe.Arguments.Select(ValueOf).ToArray();
-            value = await func(Context, value, args);
+            //var func = Methods[pipe.FunctionName.Name];
+            //var args = pipe.Arguments.Select(ValueOf).ToArray();
+            //value = await func(Context, value, args);
+
+            var pipeValueGetter = Variables.GetMethodCallLambda(value, pipe.FunctionName.Name, pipe.Arguments).Compile();
+            var nextValue = await pipeValueGetter();
+
+            value = Variables.LambdaValueOf(Variables.AddTempVar(nextValue, pipe));
         }
 
         return value;
@@ -98,8 +55,8 @@ public class AsInterpreter : IDisposable
 
     private async ValueTask ExecuteLet(AsLet let)
     {
-        var initValue = ValueOf(let.Arg);
-        PutVariable(let.Name, await RunPipe(let.Pipes, initValue));
+        var initValue = Variables.LambdaValueOf(let.Arg);
+        this.Variables.PutVariable(let.Name, await RunPipe(let.Pipes, initValue));
     }
 
     private ValueTask ExecuteUi(AsUi ui)
@@ -116,25 +73,25 @@ public class AsInterpreter : IDisposable
 
     private ValueTask ExecuteReturn(AsReturn @return)
     {
-        Return = Variables[@return.Variable.Name];
+        Return = Variables.__Boxed_GetVariable(@return.Variable);
         return ValueTask.CompletedTask;
     }
 
     private ValueTask ExecuteParam(AsParam param)
     {
-        if (!HasVariable(param.Variable)) throw new UnknownVariableException(param.Variable);
+        if (!Variables.HasVariable(param.Variable)) throw new UnknownVariableException(param.Variable);
         return ValueTask.CompletedTask;
     }
 
-    public AsInterpreter RegisterFunction(string name, Func<AsExecutionContext, object, object[], ValueTask<object>> func)
+    public AsInterpreter RegisterFunction(string name, MethodInfo method)
     {
-        Methods.Add(name, func);
+        Variables.Methods.RegisterFunction(name, method);
         return this;
     }
 
     public AsInterpreter AddVariable(string name, object value)
     {
-        Variables.Add(name, value);
+        Variables.__Unsafe_UnBoxed_PutVariable(name, value);
         return this;
     }
     
