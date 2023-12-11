@@ -15,27 +15,34 @@ namespace AnalysisScript.Interpreter.Variables.Method
     public class MethodContext(VariableContext variableContext)
     {
         private readonly Dictionary<string, MethodInfo> rawMethod = [];
-    {
+    
         private readonly Dictionary<string, MethodCallExpression> methods = [];
 
-        public void RegisterFunction(string name, MethodCallExpression function)
+        // public void RegisterFunction(string name, MethodCallExpression function)
+        // {
+        //     rawMethod.Add(name, function);
+        // }
+
+        public void RegisterFunction(string name, MethodInfo function)
         {
             rawMethod.Add(name, function);
         }
 
-        public void RegisterFunction(string name, MethodInfo function)
-        {
-        }
-
         private readonly static string ContextParamString = ExprTreeHelper.TypeParamString(typeof(AsExecutionContext));
 
-        private MethodCallExpression BuildMethod(string name, string singedName)
+        private MethodCallExpression BuildMethod(string name, string singedName, IEnumerable<MethodCallExpression> parameters)
         {
-            if (!methods.TryGetValue(name, out var method))
+            if (!this.rawMethod.TryGetValue(name, out var rawMethod))
                 throw new UnknownMethodException(name, singedName);
 
-            var (expr, sign) = ExprTreeHelper.BuildMethod(function);
-            rawMethod.Add($"{name}_{sign}", expr);
+            var signature = ExprTreeHelper.GetSignatureOf(parameters);
+
+            if (!methods.TryGetValue(signature, out var method))
+            {
+                var (expr, sign) = ExprTreeHelper.BuildMethod(rawMethod, parameters);
+                methods.Add(sign, method = expr);
+            }
+            return method;
         }
 
         public MethodCallExpression GetMethod(MethodCallExpression @this, string name, IEnumerable<MethodCallExpression> paramGetters)
@@ -48,7 +55,7 @@ namespace AnalysisScript.Interpreter.Variables.Method
             var paramSign = ExprTreeHelper.JoinTypeParams(paramStrings);
 
             if (!methods.TryGetValue(paramSign, out var method))
-                throw new UnknownMethodException(name, paramSign);
+                method = BuildMethod(name, paramSign, paramGetters);
 
             return method;
         }

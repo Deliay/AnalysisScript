@@ -51,17 +51,30 @@ namespace AnalysisScript.Interpreter.Variables
             return Expression.Call(method.Method, Enumerable.Empty<Expression>());
         }
 
+        public static Delegate Indentity(Type type) {
+            var parameter = Expression.Parameter(type);
+
+            return Expression.Lambda(parameter, parameter).Compile();
+        }
+
+        private static T Identity<T>(T instance) => instance;
+        private static Dictionary<Type, MethodInfo> IndentityMethods = [];
+        private static MethodInfo MakeIndentity(Type type)
+        {
+            if (!IndentityMethods.TryGetValue(type, out var method))
+                IndentityMethods.Add(type, method = typeof(ExprTreeHelper).GetMethod(nameof(Identity)).MakeGenericMethod(type));
+
+            return method;
+        }
+
         public static MethodCallExpression GetContainerValueLambda(IContainer container)
         {
             var constant = Expression.Constant(container);
 
-            var castedContainer = Expression.Convert(constant, container.GetType());
+            var id = MakeIndentity(container.UnderlyingType);
+            var invoke = Expression.Call(id, constant);
 
-            var valueProperty = Expression.Property(castedContainer, "Value");
-
-            var method = Expression.Lambda(valueProperty).Compile();
-            
-            return Expression.Call(method.Method, Enumerable.Empty<Expression>());
+            return invoke;
         }
 
         public static Func<string?> ExprToString(IContainer container)
@@ -103,13 +116,57 @@ namespace AnalysisScript.Interpreter.Variables
         public static string TypeParamString(Type type) => $"{type.FullName}";
         public static string JoinTypeParams(IEnumerable<string> paramStrings) => string.Join(',', paramStrings);
 
-        public static (MethodCallExpression, string) BuildMethod(MethodInfo method)
+        public static string GetSignatureOf(IEnumerable<MethodCallExpression> parameters)
         {
+            var methodSignatures = parameters.Select(getter => TypeParamString(getter.Method.ReturnType));
+            return JoinTypeParams(methodSignatures);
+        }
+
+        public static (MethodCallExpression, string) BuildGenericMethod(MethodInfo genericMethod, IEnumerable<MethodCallExpression> parameterGetters)
+        {
+            var genericTypes = genericMethod.GetGenericArguments();
+            var methodParameters = genericMethod.GetParameters();
+
+            var orderedParameter = parameterGetters.Select(getter => getter.Method.ReturnType).ToArray();
+            
+            if (methodParameters.Length != orderedParameter.Length)
+                throw new MissingMethodException($"Provided parameters doesn't match generic method {genericMethod.Name}");
+
+            Dictionary<Type, Type> GenericTypeToTargetType = [];
+            for (int i = 0; i < methodParameters.Length; i++)
+            {
+                var genericParam = methodParameters[i];
+                if (!genericParam.ParameterType.IsGenericMethodParameter) continue;
+    
+                if (GenericTypeToTargetType.ContainsKey(genericParam.ParameterType)) continue;
+
+                GenericTypeToTargetType.Add(genericParam.ParameterType, orderedParameter[i]);
+            }
+
+            var method = genericMethod.MakeGenericMethod(genericTypes.Select((type) => GenericTypeToTargetType[type]).ToArray());
+
+            return BuildMethod(method, parameterGetters);
+        }
+
+        public static (MethodCallExpression, string) BuildMethod(MethodInfo method, IEnumerable<MethodCallExpression> parameters)
+        {
+            var signature = GetSignatureOf(parameters);
+
+            if (method.IsGenericMethod)
+            {
+                return BuildGenericMethod(method, parameters);
+            }
+
             var methodParams = method.GetParameters().Select(param => Expression.Parameter(param.ParameterType, param.Name));
-            var methodSignatures = method.GetParameters().Select(param => TypeParamString(param.ParameterType));
+            var methodParamSignatures = method.GetParameters().Select(param => TypeParamString(param.ParameterType));
+            var methodSignature = JoinTypeParams(methodParamSignatures);
+
+            if (signature != methodSignature)
+                throw new MissingMethodException($"method {method.Name} doesn't match argument signature {signature}");
+
             var callExpr = Expression.Call(null, method, methodParams);
 
-            return (callExpr, JoinTypeParams(methodSignatures));
+            return (callExpr, methodSignature);
         }
 
         private static Dictionary<Type, MethodInfo> TypeToCastMethod = [];
