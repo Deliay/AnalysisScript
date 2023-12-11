@@ -1,4 +1,5 @@
 ﻿using AnalysisScript.Interpreter;
+using AnalysisScript.Interpreter.Variables;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,10 +14,10 @@ namespace AnalysisScript.Library
 
         public static LambdaExpression Select<T>(AsExecutionContext ctx, T @this, string propertyName)
         {
-            var param = Expression.Parameter(@this.GetType());
-            var property = Expression.Property(param, propertyName);
+            var paramGetter = ExprTreeHelper.GetConstantValueLambda(@this);
+            var property = Expression.Property(paramGetter, propertyName);
 
-            return Expression.Lambda(property, param);
+            return Expression.Lambda(property);
         }
         public static AsInterpreter RegisterBasicFunctionsV2(this AsInterpreter interpreter)
         {

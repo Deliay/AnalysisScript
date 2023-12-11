@@ -33,11 +33,15 @@ public class AsInterpreter : IDisposable
         OnLogging?.Invoke(message);
     }
 
-    private async ValueTask<object> RunPipe(List<AsPipe> pipes, MethodCallExpression initialValue)
+    private async ValueTask<AsIdentity> RunPipe(List<AsPipe> pipes, AsObject initialValue)
     {
-        if (pipes.Count == 0) return initialValue;
+        var initialValueId = Variables.Storage(initialValue);
+        if (pipes.Count == 0) return initialValueId;
 
-        var value = initialValue;
+        var initValue = Variables.LambdaValueOf(initialValueId);
+        var value = initValue;
+
+        var lastValueId = initialValueId;
         foreach (var pipe in pipes)
         {
             //var func = Methods[pipe.FunctionName.Name];
@@ -46,17 +50,18 @@ public class AsInterpreter : IDisposable
 
             var pipeValueGetter = Variables.GetMethodCallLambda(value, pipe.FunctionName.Name, pipe.Arguments, Context).Compile();
             var nextValue = await pipeValueGetter();
-
-            value = Variables.LambdaValueOf(Variables.AddTempVar(nextValue, pipe));
+            var sanitizedValue = await ExprTreeHelper.SanitizeLambdaExpression(nextValue);
+            
+            value = Variables.LambdaValueOf(lastValueId = Variables.AddTempVar(sanitizedValue, pipe.LexicalToken));
         }
 
-        return value;
+        return lastValueId;
     }
 
     private async ValueTask ExecuteLet(AsLet let)
     {
-        var initValue = Variables.LambdaValueOf(let.Arg);
-        this.Variables.PutVariable(let.Name, await RunPipe(let.Pipes, initValue));
+        var runtimeValue = await RunPipe(let.Pipes, let.Arg);
+        this.Variables.PutVariableContainer(let.Name, Variables.GetVariableContainer(runtimeValue));
     }
 
     private ValueTask ExecuteUi(AsUi ui)

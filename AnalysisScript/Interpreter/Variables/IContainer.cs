@@ -24,7 +24,7 @@ namespace AnalysisScript.Interpreter.Variables
         public T? As<T>() => ((Container<T>)this).Value;
 
 
-        public string? UnerlyingToString() => ExprTreeHelper.ExprToString(this)();
+        public string? UnerlyingToString() => ExprTreeHelper.ExprToString(this);
 
         public object? BoxedUnderlyingValue() => ExprTreeHelper.BoxUnderlyingValue(this)();
     }

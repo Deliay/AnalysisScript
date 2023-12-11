@@ -26,7 +26,7 @@ namespace AnalysisScript.Interpreter.Variables
         {
             if (!TypeToString.TryGetValue(underlying, out var method))
             {
-                TypeToString.Add(underlying, method = underlying.GetMethod("ToString")!);
+                TypeToString.Add(underlying, method = underlying.GetRuntimeMethod("ToString", [])!);
             }
 
             return method;
@@ -77,15 +77,19 @@ namespace AnalysisScript.Interpreter.Variables
             return invoke;
         }
 
-        public static Func<string?> ExprToString(IContainer container)
+        public static string? ExprToString(IContainer container)
         {
-            var (parameter, value) = UnderlyingValueExpr(container);
+            var (parameter, valueGetter) = UnderlyingValueExpr(container);
 
-            var callUnderlyingToString = Expression.Call(value, GetToStringMethod(container.UnderlyingType));
+            var lambda = Expression.Lambda(valueGetter);
 
-            var rawFunc = Expression.Lambda<Func<IContainer, string?>>(callUnderlyingToString, parameter).Compile();
+            var invoke = Expression.Invoke(lambda);
 
-            return () => rawFunc(container);
+            var callUnderlyingToString = Expression.Call(invoke, GetToStringMethod(container.UnderlyingType));
+
+            var toString = Expression.Lambda<Func<IContainer, string>>(callUnderlyingToString, parameter);
+
+            return toString.Compile()(container);
         }
 
         public static Func<object?> BoxUnderlyingValue(IContainer container)
@@ -95,6 +99,32 @@ namespace AnalysisScript.Interpreter.Variables
             var rawFunc = Expression.Lambda<Func<IContainer, object?>>(value, parameter).Compile();
 
             return () => rawFunc(container);
+        }
+
+        public static IContainer SanitizeIdentityMethodCallExpression(MethodCallExpression expr)
+        {
+            if (!(expr.Method == MakeIndentity(expr.Method.ReturnType)))
+                throw new InvalidCastException("Can't sanitize non Identity MethodCallExpression");
+
+            return Expression.Lambda<Func<IContainer>>(expr).Compile()();
+        }
+
+        public static async ValueTask<IContainer> SanitizeLambdaExpression(IContainer value)
+        {
+            if (value.UnderlyingType == typeof(LambdaExpression)) {
+                var expr = value.As<LambdaExpression>();
+                var invoke = Expression.Invoke(expr);
+
+                var retContainerType = GetContainerType(expr.ReturnType);
+                var retContainerTypeCtor = retContainerType.GetConstructors()[0];
+                var wrappedValue = Expression.Call(GetTypeToCastMethod(expr.ReturnType), invoke);
+                
+                var valueLambda = Expression.Lambda<Func<ValueTask<IContainer>>>(wrappedValue);
+                var valueGetter = valueLambda.Compile();
+                return await valueGetter();
+            } else {
+                return value;
+            }
         }
 
         public static Func<object, IContainer> UnboxToContainer(object instance)
@@ -178,17 +208,17 @@ namespace AnalysisScript.Interpreter.Variables
         {
             if (!TypeToCastMethod.TryGetValue(underlying, out var method))
             {
-                if (underlying.BaseType == typeof(ValueTask<>).BaseType)
+                if (underlying.GUID == typeof(ValueTask<>).GUID)
                 {
-                    TypeToString.Add(underlying, method = typeof(ExprTreeHelper).GetMethod(nameof(AsyncValueTaskCast))!);
+                    TypeToCastMethod.Add(underlying, method = typeof(ExprTreeHelper).GetMethod(nameof(AsyncValueTaskCast)).MakeGenericMethod(underlying)!);
                 }
-                else if (underlying.BaseType == typeof(Task<>).BaseType)
+                else if (underlying.GUID == typeof(Task<>).GUID)
                 {
-                    TypeToString.Add(underlying, method = typeof(ExprTreeHelper).GetMethod(nameof(AsyncTaskCast))!);
+                    TypeToCastMethod.Add(underlying, method = typeof(ExprTreeHelper).GetMethod(nameof(AsyncTaskCast)).MakeGenericMethod(underlying)!);
                 }
                 else
                 {
-                    TypeToString.Add(underlying, method = typeof(ExprTreeHelper).GetMethod(nameof(ValueTaskCast))!);
+                    TypeToCastMethod.Add(underlying, method = typeof(ExprTreeHelper).GetMethod(nameof(ValueTaskCast)).MakeGenericMethod(underlying)!);
                 }
             }
 

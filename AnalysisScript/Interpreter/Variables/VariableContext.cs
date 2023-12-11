@@ -1,4 +1,5 @@
 ﻿using AnalysisScript.Interpreter.Variables.Method;
+using AnalysisScript.Lexical;
 using AnalysisScript.Parser.Ast.Basic;
 using AnalysisScript.Parser.Ast.Operator;
 using System;
@@ -15,9 +16,9 @@ namespace AnalysisScript.Interpreter.Variables
     {
         private readonly Dictionary<string, IContainer> variables = [];
         private int tempVar = 0;
-        public AsIdentity AddTempVar(IContainer value, AsPipe pipe)
+        public AsIdentity AddTempVar(IContainer value, IToken token)
         {
-            var id = new AsIdentity(new Lexical.Token.Identity($"\"_temp_var_{tempVar++}", pipe.LexicalToken.Pos));
+            var id = new AsIdentity(new Token.Identity($"\"_temp_var_{tempVar++}", token.Pos));
             variables.Add(id.Name, value);
             return id;
         }
@@ -35,6 +36,15 @@ namespace AnalysisScript.Interpreter.Variables
 
             variables.Add(id.Name, IContainer.Of(value));
         }
+
+        public void PutVariableContainer(AsIdentity id, IContainer value)
+        {
+            if (variables.ContainsKey(id.Name))
+                throw new VariableAlreadyExistsException(id);
+
+            variables.Add(id.Name, value);
+        }
+
 
         public bool HasVariable(AsIdentity id) => variables.ContainsKey(id.Name);
 
@@ -65,6 +75,14 @@ namespace AnalysisScript.Interpreter.Variables
         public void __Unsafe_UnBoxed_PutVariable(string name, object value)
         {
             variables.Add(name, ExprTreeHelper.UnboxToContainer(value)(value));
+        }
+
+        public AsIdentity Storage(AsObject @object)
+        {
+            if (@object is AsString str) return AddTempVar(IContainer.Of(Interpolation(str)), str.LexicalToken);
+            else if (@object is AsNumber num) return AddTempVar(IContainer.Of(num.Real), num.LexicalToken);
+            else if (@object is AsIdentity id) return id;
+            throw new UnknownValueObjectException(@object);
         }
 
         public object ValueOf(AsObject @object)
@@ -98,9 +116,8 @@ namespace AnalysisScript.Interpreter.Variables
         {
             var exprValues = args(methodParams, @this, ctx);
             var method = Methods.GetMethod(@this, name, exprValues);
-            var init = new[] { @this };
 
-            method = method.Update(method.Object, init.Concat(exprValues.Cast<Expression>()));
+            method = method.Update(method.Object, exprValues.Cast<Expression>());
             method = Expression.Call(ExprTreeHelper.GetTypeToCastMethod(method.Method.ReturnType), method);
 
             return Expression.Lambda<Func<ValueTask<IContainer>>>(method);
