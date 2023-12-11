@@ -83,9 +83,19 @@ namespace AnalysisScript.Interpreter.Variables
             throw new UnknownValueObjectException(@object);
         }
 
-        public Expression<Func<ValueTask<IContainer>>> GetMethodCallLambda(MethodCallExpression @this, string name, List<AsObject> methodParams)
+        private IEnumerable<MethodCallExpression> args(IEnumerable<AsObject> arguments, MethodCallExpression @this, AsExecutionContext ctx)
         {
-            var exprValues = methodParams.Select(LambdaValueOf);
+            yield return ExprTreeHelper.GetConstantValueLambda(ctx);
+            yield return @this;
+            foreach (var item in arguments)
+            {
+                yield return LambdaValueOf(item);
+            }
+        }
+
+        public Expression<Func<ValueTask<IContainer>>> GetMethodCallLambda(MethodCallExpression @this, string name, List<AsObject> methodParams, AsExecutionContext ctx)
+        {
+            var exprValues = args(methodParams, @this, ctx);
             var method = Methods.GetMethod(@this, name, exprValues);
             var init = new[] { @this };
 

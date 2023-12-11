@@ -44,11 +44,7 @@ namespace AnalysisScript.Interpreter.Variables
 
         public static MethodCallExpression GetConstantValueLambda(object? value)
         {
-            var constant = Expression.Constant(value);
-
-            var method = Expression.Lambda(constant).Compile();
-
-            return Expression.Call(method.Method, Enumerable.Empty<Expression>());
+            return GetContainerValueLambda(IContainer.Of(value));
         }
 
         public static Delegate Indentity(Type type) {
@@ -57,12 +53,16 @@ namespace AnalysisScript.Interpreter.Variables
             return Expression.Lambda(parameter, parameter).Compile();
         }
 
-        private static T Identity<T>(T instance) => instance;
-        private static Dictionary<Type, MethodInfo> IndentityMethods = [];
+        public static T Identity<T>(Container<T> instance) => instance.Value;
+        private readonly static Dictionary<Type, MethodInfo> IndentityMethods = [];
         private static MethodInfo MakeIndentity(Type type)
         {
             if (!IndentityMethods.TryGetValue(type, out var method))
-                IndentityMethods.Add(type, method = typeof(ExprTreeHelper).GetMethod(nameof(Identity)).MakeGenericMethod(type));
+            {
+                var selfType = typeof(ExprTreeHelper);
+                var genericMethod = selfType.GetMethod(nameof(Identity));
+                IndentityMethods.Add(type, method = genericMethod.MakeGenericMethod(type));
+            }
 
             return method;
         }

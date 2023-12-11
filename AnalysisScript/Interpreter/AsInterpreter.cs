@@ -15,7 +15,7 @@ public class AsInterpreter : IDisposable
     public object? Return { get; private set; }
     public string LastComment { get; private set; } = "";
     public string CurrentCommand { get; private set; } = "";
-    public AsExecutionContext Context { get; private set; }
+    public AsExecutionContext Context { get; }
 
     public event Action<string>? OnCommentUpdate;
 
@@ -44,7 +44,7 @@ public class AsInterpreter : IDisposable
             //var args = pipe.Arguments.Select(ValueOf).ToArray();
             //value = await func(Context, value, args);
 
-            var pipeValueGetter = Variables.GetMethodCallLambda(value, pipe.FunctionName.Name, pipe.Arguments).Compile();
+            var pipeValueGetter = Variables.GetMethodCallLambda(value, pipe.FunctionName.Name, pipe.Arguments, Context).Compile();
             var nextValue = await pipeValueGetter();
 
             value = Variables.LambdaValueOf(Variables.AddTempVar(nextValue, pipe));
