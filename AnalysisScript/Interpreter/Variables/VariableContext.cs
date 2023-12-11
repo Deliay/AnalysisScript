@@ -89,7 +89,8 @@ namespace AnalysisScript.Interpreter.Variables
             yield return @this;
             foreach (var item in arguments)
             {
-                yield return LambdaValueOf(item);
+                var expr = LambdaValueOf(item);
+                yield return expr;
             }
         }
 

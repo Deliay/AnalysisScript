@@ -11,12 +11,12 @@ namespace AnalysisScript.Library
     public static class BasicFunctionV2
     {
 
-        public static R Select<T, R>(AsExecutionContext ctx, T @this, string propertyName)
+        public static LambdaExpression Select<T>(AsExecutionContext ctx, T @this, string propertyName)
         {
             var param = Expression.Parameter(@this.GetType());
             var property = Expression.Property(param, propertyName);
 
-            return Expression.Lambda<Func<T, R>>(property, param).Compile()(@this);
+            return Expression.Lambda(property, param);
         }
         public static AsInterpreter RegisterBasicFunctionsV2(this AsInterpreter interpreter)
         {

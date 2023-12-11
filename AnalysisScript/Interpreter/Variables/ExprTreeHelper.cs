@@ -42,7 +42,7 @@ namespace AnalysisScript.Interpreter.Variables
             return (parameter, valueProperty);
         }
 
-        public static MethodCallExpression GetConstantValueLambda(object? value)
+        public static MethodCallExpression GetConstantValueLambda<T>(T? value)
         {
             return GetContainerValueLambda(IContainer.Of(value));
         }
@@ -142,6 +142,9 @@ namespace AnalysisScript.Interpreter.Variables
 
                 GenericTypeToTargetType.Add(genericParam.ParameterType, orderedParameter[i]);
             }
+            
+            if (genericTypes.Any(type => !GenericTypeToTargetType.ContainsKey(type)))
+                throw new MissingMethodException($"Generic type inference doesn't support now, use LambdaExpression for instead");
 
             var method = genericMethod.MakeGenericMethod(genericTypes.Select((type) => GenericTypeToTargetType[type]).ToArray());
 
@@ -152,7 +155,7 @@ namespace AnalysisScript.Interpreter.Variables
         {
             var signature = GetSignatureOf(parameters);
 
-            if (method.IsGenericMethod)
+            if (method.IsGenericMethodDefinition)
             {
                 return BuildGenericMethod(method, parameters);
             }
