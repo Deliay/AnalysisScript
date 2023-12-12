@@ -170,13 +170,31 @@ namespace AnalysisScript.Interpreter.Variables
             return parameters.Select(getter => getter.Method.ReturnType).ToList();
         }
 
+        private static Type? FindStableType(Type target, Type source)
+        {
+            if (source.GUID == target.GUID) return source;
+
+            var interfaces = source.GetInterfaces();
+            for (int i = 0; i < interfaces.Length; i++)
+            {
+                var candidate = interfaces[i];
+
+                if (candidate.GUID == target.GUID) return candidate;
+                
+                var childStableType = FindStableType(target, candidate);
+
+                if (childStableType is not null) return childStableType;
+            }
+            return null!;
+        }
+
         private static IEnumerable<(Type, Type)> ExtractTypeMapping(Type generic, Type parameter)
         {
-            if (generic.GUID != parameter.GUID)
-                throw new InvalidCastException($"Type mismatched, {generic} to {parameter}");
-
+            var genericImplType = FindStableType(generic, parameter)
+                ?? throw new InvalidCastException($"Type mismatched, {generic} to {parameter}");
+                
             var genericTypes = generic.GetGenericArguments();
-            var parameteredTypes = parameter.GetGenericArguments();
+            var parameteredTypes = genericImplType.GetGenericArguments();
 
             for (int i = 0; i < genericTypes.Length; i++)
             {
@@ -240,11 +258,11 @@ namespace AnalysisScript.Interpreter.Variables
             return true;
         }
 
-        public static (MethodCallExpression, string) BuildMethod(List<MethodInfo> methods, IEnumerable<MethodCallExpression> parameters)
+        public static (MethodCallExpression, string) BuildMethod(List<(MethodInfo, ConstantExpression?)> methods, IEnumerable<MethodCallExpression> parameters)
         {
             var signature = GetSignatureTypesOf(parameters);
-            methods.Sort((a, b) => { return a.IsGenericMethodDefinition ? 1 : -1; });
-            foreach (var method in methods)
+            methods.Sort((a, b) => { return a.Item1.IsGenericMethodDefinition ? 1 : -1; });
+            foreach (var (method, instance) in methods)
             {
                 var currentMethod = method;
                 if (method.IsGenericMethodDefinition)
@@ -256,7 +274,7 @@ namespace AnalysisScript.Interpreter.Variables
 
                 if (!SignatureMatch(signature, methodParamSignatures)) continue;
                 var methodParams = currentMethod.GetParameters().Select(param => Expression.Parameter(param.ParameterType, param.Name));
-                var callExpr = Expression.Call(null, currentMethod, methodParams);
+                var callExpr = Expression.Call(instance, currentMethod, methodParams);
 
                 return (callExpr, GetSignatureOf(parameters));
             }
@@ -272,11 +290,13 @@ namespace AnalysisScript.Interpreter.Variables
             {
                 if (underlying.GUID == typeof(ValueTask<>).GUID)
                 {
-                    TypeToCastMethod.Add(underlying, method = typeof(ExprTreeHelper).GetMethod(nameof(AsyncValueTaskCast)).MakeGenericMethod(underlying)!);
+                    var currentTaskResultType = underlying.GenericTypeArguments[0];
+                    TypeToCastMethod.Add(underlying, method = typeof(ExprTreeHelper).GetMethod(nameof(AsyncValueTaskCast)).MakeGenericMethod(currentTaskResultType)!);
                 }
                 else if (underlying.GUID == typeof(Task<>).GUID)
                 {
-                    TypeToCastMethod.Add(underlying, method = typeof(ExprTreeHelper).GetMethod(nameof(AsyncTaskCast)).MakeGenericMethod(underlying)!);
+                    var currentTaskResultType = underlying.GenericTypeArguments[0];
+                    TypeToCastMethod.Add(underlying, method = typeof(ExprTreeHelper).GetMethod(nameof(AsyncTaskCast)).MakeGenericMethod(currentTaskResultType)!);
                 }
                 else
                 {

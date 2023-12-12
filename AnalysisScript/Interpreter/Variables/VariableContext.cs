@@ -18,7 +18,7 @@ namespace AnalysisScript.Interpreter.Variables
         private int tempVar = 0;
         public AsIdentity AddTempVar(IContainer value, IToken token)
         {
-            var id = new AsIdentity(new Token.Identity($"\"_temp_var_{tempVar++}", token.Pos));
+            var id = new AsIdentity(new Token.Identity($"\"_temp_var_{++tempVar}", token.Pos, token.Line));
             variables.Add(id.Name, value);
             return id;
         }
@@ -27,6 +27,14 @@ namespace AnalysisScript.Interpreter.Variables
         public VariableContext()
         {
             Methods = new(this);
+        }
+
+        public void PutInitVariable<T>(string name, T value)
+        {
+            if (variables.ContainsKey(name))
+                throw new VariableAlreadyExistsException($"Initialize variable {name} already exists");
+
+            variables.Add(name, IContainer.Of(value));
         }
 
         public void PutVariable<T>(AsIdentity id, T value)
@@ -118,7 +126,8 @@ namespace AnalysisScript.Interpreter.Variables
             var method = Methods.GetMethod(@this, name, exprValues);
 
             method = method.Update(method.Object, exprValues.Cast<Expression>());
-            method = Expression.Call(ExprTreeHelper.GetTypeToCastMethod(method.Method.ReturnType), method);
+            var retValueType = ExprTreeHelper.GetTypeToCastMethod(method.Method.ReturnType);
+            method = Expression.Call(retValueType, method);
 
             return Expression.Lambda<Func<ValueTask<IContainer>>>(method);
         }

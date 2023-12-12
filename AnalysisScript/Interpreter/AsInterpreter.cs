@@ -12,10 +12,11 @@ namespace AnalysisScript.Interpreter;
 public class AsInterpreter : IDisposable
 {
     private VariableContext Variables { get; } = new();
-    public object? Return { get; private set; }
+    public IContainer? Return { get; private set; }
     public string LastComment { get; private set; } = "";
     public string CurrentCommand { get; private set; } = "";
     public AsExecutionContext Context { get; }
+    public AsAnalysis Tree { get; }
 
     public event Action<string>? OnCommentUpdate;
 
@@ -23,9 +24,10 @@ public class AsInterpreter : IDisposable
 
     public event Action<string>? OnLogging;
 
-    public AsInterpreter()
+    public AsInterpreter(AsAnalysis tree)
     {
         this.Context = new AsExecutionContext(Logging);
+        Tree = tree;
     }
 
     private void Logging(string message)
@@ -44,6 +46,7 @@ public class AsInterpreter : IDisposable
         var lastValueId = initialValueId;
         foreach (var pipe in pipes)
         {
+            Context.CurrentExecuteObject = pipe;
             //var func = Methods[pipe.FunctionName.Name];
             //var args = pipe.Arguments.Select(ValueOf).ToArray();
             //value = await func(Context, value, args);
@@ -78,7 +81,7 @@ public class AsInterpreter : IDisposable
 
     private ValueTask ExecuteReturn(AsReturn @return)
     {
-        Return = Variables.__Boxed_GetVariable(@return.Variable);
+        Return = Variables.GetVariableContainer(@return.Variable);
         return ValueTask.CompletedTask;
     }
 
@@ -88,25 +91,30 @@ public class AsInterpreter : IDisposable
         return ValueTask.CompletedTask;
     }
 
-    public AsInterpreter RegisterFunction(string name, MethodInfo method)
+    public AsInterpreter RegisterStaticFunction(string name, MethodInfo method)
     {
-        Variables.Methods.RegisterFunction(name, method);
-        return this;
-    }
-
-    public AsInterpreter AddVariable(string name, object value)
-    {
-        Variables.__Unsafe_UnBoxed_PutVariable(name, value);
+        Variables.Methods.RegisterStaticFunction(name, method);
         return this;
     }
     
-    public async ValueTask<T?> RunAndReturn<T>(AsAnalysis tree, CancellationToken token)
+    public AsInterpreter RegisterInstanceFunction(string name, Delegate @delegate)
     {
-        await Run(tree, token);
+        Variables.Methods.RegisterInstanceFunction(name, @delegate);
+        return this;
+    }
+
+    public AsInterpreter AddVariable<T>(string name, T value)
+    {
+        Variables.PutInitVariable(name, value);
+        return this;
+    }
+    
+    public async ValueTask<T?> RunAndReturn<T>(CancellationToken token)
+    {
+        await Run(token);
         if (Return is not null)
         {
-            Assert.Is<T>(Return, out var result);
-            return result;
+            return Return.As<T>();
         }
 
         return default;
@@ -116,6 +124,8 @@ public class AsInterpreter : IDisposable
     {
         CurrentCommand = cmd?.ToString()!;
         OnCommandUpdate?.Invoke(CurrentCommand);
+
+        Context.CurrentExecuteObject = cmd;
 
         if (cmd.Type == CommandType.Comment && cmd is AsComment comment)
         {
@@ -140,17 +150,17 @@ public class AsInterpreter : IDisposable
         else throw new UnknownCommandException(cmd);
     }
 
-    public async ValueTask Run(AsAnalysis tree, CancellationToken token = default) {
-        foreach (var cmd in tree.Commands)
+    public async ValueTask Run(CancellationToken token = default) {
+        try
         {
-            try
+            foreach (var cmd in Tree.Commands)
             {
                 await RunCommand(cmd, token);
             }
-            catch (Exception ex) 
-            {
-                throw new AsRuntimeException(cmd, ex);
-            }
+        }
+        catch (Exception ex) 
+        {
+            throw new AsRuntimeException(Context, ex);
         }
     }
 

@@ -14,7 +14,7 @@ namespace AnalysisScript.Interpreter.Variables.Method
 {
     public class MethodContext(VariableContext variableContext)
     {
-        private readonly Dictionary<string, List<MethodInfo>> rawMethod = [];
+        private readonly Dictionary<string, List<(MethodInfo, ConstantExpression?)>> rawMethod = [];
     
         private readonly Dictionary<string, MethodCallExpression> methods = [];
 
@@ -23,13 +23,31 @@ namespace AnalysisScript.Interpreter.Variables.Method
         //     rawMethod.Add(name, function);
         // }
 
-        public void RegisterFunction(string name, MethodInfo function)
+        public void RegisterStaticFunction(string name, MethodInfo function)
         {
+            if (!function.IsStatic)
+            {
+                throw new NullReferenceException("Can't register instance method to static registry");
+            }
             if (!rawMethod.TryGetValue(name, out var methodList))
             {
-                rawMethod.Add(name, [function]);
+                rawMethod.Add(name, [(function, null)]);
             }
-            else methodList.Add(function);
+            else methodList.Add((function, null));
+        }
+
+        public void RegisterInstanceFunction(string name, Delegate @delegate)
+        {
+            if (@delegate.Method.IsStatic && @delegate.Target is null)
+            {
+                throw new NullReferenceException("Instance is null when register instance function");
+            }
+            var constant = Expression.Constant(@delegate.Target);
+            if (!rawMethod.TryGetValue(name, out var methodList))
+            {
+                rawMethod.Add(name, [(@delegate.Method, constant)]);
+            }
+            else methodList.Add((@delegate.Method, constant));
         }
 
         private readonly static string ContextParamString = ExprTreeHelper.TypeParamString(typeof(AsExecutionContext));
@@ -39,12 +57,12 @@ namespace AnalysisScript.Interpreter.Variables.Method
             if (!this.rawMethod.TryGetValue(name, out var rawMethods))
                 throw new UnknownMethodException(name, singedName);
 
-            var signature = ExprTreeHelper.GetSignatureOf(parameters);
+            var signature = string.Join(',', name, ExprTreeHelper.GetSignatureOf(parameters));
 
             if (!methods.TryGetValue(signature, out var method))
             {
                 var (expr, sign) = ExprTreeHelper.BuildMethod(rawMethods, parameters);
-                methods.Add(sign, method = expr);
+                methods.Add(string.Join(',', name, sign), method = expr);
             }
             return method;
         }
@@ -52,7 +70,7 @@ namespace AnalysisScript.Interpreter.Variables.Method
         public MethodCallExpression GetMethod(MethodCallExpression @this, string name, IEnumerable<MethodCallExpression> paramGetters)
         {
             var prefix = new string[2] {
-                ContextParamString,
+                name,
                 ExprTreeHelper.TypeParamString(@this.Method.ReturnType),
             };
             var paramStrings = prefix.Concat(paramGetters.Select(getter => ExprTreeHelper.TypeParamString(getter.Method.ReturnType)));

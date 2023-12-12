@@ -5,7 +5,7 @@
         public static IEnumerable<IToken> Analyze(string source)
         {
             if (string.IsNullOrWhiteSpace(source)) yield break;
-
+            int line = -1;
             int pos = 0;
             char current;
 
@@ -20,11 +20,11 @@
                 Peek();
                 if (current == '|')
                 {
-                    yield return new Token.Pipe(pos);
+                    yield return new Token.Pipe(pos, line);
                 }
                 else if (current == '=')
                 {
-                    yield return new Token.Equal(pos);
+                    yield return new Token.Equal(pos, line);
                 }
                 else if (char.IsNumber(current))
                 {
@@ -43,7 +43,7 @@
                             d *= 10;
                         }
                     }
-                    yield return new Token.Number(real, pos);
+                    yield return new Token.Number(real, pos, line);
                 }
                 else if (IsIdentityStart(current))
                 {
@@ -52,11 +52,11 @@
                     {
                         val += current;
                     }
-                    if (val == "let") yield return new Token.Let(pos);
-                    else if (val == "param") yield return new Token.Param(pos);
-                    else if (val == "ui") yield return new Token.Ui(pos);
-                    else if (val == "return") yield return new Token.Return(pos);
-                    else yield return new Token.Identity(val, pos);
+                    if (val == "let") yield return new Token.Let(pos, line);
+                    else if (val == "param") yield return new Token.Param(pos, line);
+                    else if (val == "ui") yield return new Token.Ui(pos, line);
+                    else if (val == "return") yield return new Token.Return(pos, line);
+                    else yield return new Token.Identity(val, pos, line);
                 }
                 else if (IsQuote(current))
                 {
@@ -73,7 +73,7 @@
                         }
                         else val += current;
                     }
-                    yield return new Token.String(val, pos);
+                    yield return new Token.String(val, pos, line);
                 }
                 else if (current == '#')
                 {
@@ -82,15 +82,16 @@
                     {
                         val += current;
                     }
-                    yield return new Token.Comment(val, pos);
-                    yield return new Token.NewLine();
+                    yield return new Token.Comment(val, pos, ++line);
+                    line += 1;
+                    yield return new Token.NewLine(pos, ++line);
                 }
-                else if (current == '\n') yield return new Token.NewLine(pos);
+                else if (current == '\n') yield return new Token.NewLine(pos, ++line);
                 else if (char.IsWhiteSpace(current)) continue;
                 else throw new InvalidTokenException(pos, current.ToString());
             } while (HasMore());
 
-            yield return new Token.NewLine(pos);
+            yield return new Token.NewLine(pos, ++line);
         }
     }
 }
