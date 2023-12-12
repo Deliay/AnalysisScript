@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Net.Http.Json;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -25,13 +26,34 @@ namespace AnalysisScript.Library
             return regex;
         }
 
-        public static LambdaExpression Select<T>(AsExecutionContext ctx, T @this, string propertyName)
+        public static LambdaExpression SelectSingle<T>(AsExecutionContext ctx, T @this, string propertyName)
         {
             var paramGetter = ExprTreeHelper.GetConstantValueLambda(@this);
             var property = Expression.Property(paramGetter, propertyName);
 
             return Expression.Lambda(property);
         }
+
+        private readonly static MethodInfo SelectMethod = typeof(BasicFunctionV2).GetMethod("SelectWrapper")
+            ?? throw new InvalidProgramException("Can't find Select(IEnumerable<>, Func<,>) method from Enumerable class");
+
+        public static IEnumerable<R> SelectWrapper<T, R>(IEnumerable<T> source, Func<T, R> mapper) => source.Select(mapper);
+
+        public static LambdaExpression SelectSequence<T>(AsExecutionContext ctx, IEnumerable<T> @this, string propertyName)
+        {
+            var param = Expression.Parameter(typeof(T));
+            var property = Expression.Property(param, propertyName);
+
+            var thisParam = ExprTreeHelper.GetConstantValueLambda(@this);
+
+            var mapperMethod = Expression.Lambda(property, param);
+            var selectMethod = SelectMethod.MakeGenericMethod([typeof(T), property.Type]);
+
+            var callSelect = Expression.Call(null, selectMethod, thisParam, mapperMethod);
+
+            return Expression.Lambda(callSelect);
+        }
+
 
         public static string Join<T>(AsExecutionContext ctx, IEnumerable<T> values, string delimiter)
         {
@@ -131,7 +153,8 @@ namespace AnalysisScript.Library
 
         public static AsInterpreter RegisterBasicFunctionsV2(this AsInterpreter interpreter)
         {
-            interpreter.RegisterStaticFunction("select", typeof(BasicFunctionV2).GetMethod(nameof(Select)));
+            interpreter.RegisterStaticFunction("select", typeof(BasicFunctionV2).GetMethod(nameof(SelectSingle)));
+            interpreter.RegisterStaticFunction("select", typeof(BasicFunctionV2).GetMethod(nameof(SelectSequence)));
             interpreter.RegisterStaticFunction("join", typeof(BasicFunctionV2).GetMethod(nameof(Join)));
 
             interpreter.RegisterStaticFunction("filter_contains", typeof(BasicFunctionV2).GetMethod(nameof(FilterContains)));
