@@ -170,6 +170,20 @@ namespace AnalysisScript.Interpreter.Variables
             return parameters.Select(getter => getter.Method.ReturnType).ToList();
         }
 
+        private static IEnumerable<(Type, Type)> ExtractTypeMapping(Type generic, Type parameter)
+        {
+            if (generic.GUID != parameter.GUID)
+                throw new InvalidCastException($"Type mismatched, {generic} to {parameter}");
+
+            var genericTypes = generic.GetGenericArguments();
+            var parameteredTypes = parameter.GetGenericArguments();
+
+            for (int i = 0; i < genericTypes.Length; i++)
+            {
+                yield return (genericTypes[i], parameteredTypes[i]);
+            }
+        }
+
         public static bool TryBuildGenericMethod(MethodInfo genericMethod, IEnumerable<MethodCallExpression> parameterGetters, [NotNullWhen(true)]out MethodInfo? method)
         {
             var genericTypes = genericMethod.GetGenericArguments();
@@ -186,11 +200,21 @@ namespace AnalysisScript.Interpreter.Variables
             for (int i = 0; i < methodParameters.Length; i++)
             {
                 var genericParam = methodParameters[i];
-                if (!genericParam.ParameterType.IsGenericMethodParameter) continue;
+                if (!genericParam.ParameterType.ContainsGenericParameters) continue;
     
                 if (GenericTypeToTargetType.ContainsKey(genericParam.ParameterType)) continue;
 
-                GenericTypeToTargetType.Add(genericParam.ParameterType, orderedParameter[i]);
+                if (genericParam.ParameterType.IsGenericParameter)
+                {
+                    GenericTypeToTargetType.Add(genericParam.ParameterType, orderedParameter[i]);
+                }
+                else
+                {
+                    foreach (var (a, b) in ExtractTypeMapping(genericParam.ParameterType, orderedParameter[i]))
+                    {
+                        GenericTypeToTargetType.Add(a, b);
+                    }
+                }
             }
             
             if (genericTypes.Any(type => !GenericTypeToTargetType.ContainsKey(type)))
