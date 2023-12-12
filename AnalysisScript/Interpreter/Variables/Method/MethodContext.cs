@@ -16,7 +16,7 @@ namespace AnalysisScript.Interpreter.Variables.Method
     {
         private readonly Dictionary<string, List<(MethodInfo, ConstantExpression?)>> rawMethod = [];
     
-        private readonly Dictionary<string, MethodCallExpression> methods = [];
+        private readonly static Dictionary<string, MethodCallExpression> methods = [];
 
         // public void RegisterFunction(string name, MethodCallExpression function)
         // {
