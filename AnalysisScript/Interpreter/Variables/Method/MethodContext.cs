@@ -14,7 +14,7 @@ namespace AnalysisScript.Interpreter.Variables.Method
 {
     public class MethodContext(VariableContext variableContext)
     {
-        private readonly Dictionary<string, MethodInfo> rawMethod = [];
+        private readonly Dictionary<string, List<MethodInfo>> rawMethod = [];
     
         private readonly Dictionary<string, MethodCallExpression> methods = [];
 
@@ -25,21 +25,25 @@ namespace AnalysisScript.Interpreter.Variables.Method
 
         public void RegisterFunction(string name, MethodInfo function)
         {
-            rawMethod.Add(name, function);
+            if (!rawMethod.TryGetValue(name, out var methodList))
+            {
+                rawMethod.Add(name, [function]);
+            }
+            else methodList.Add(function);
         }
 
         private readonly static string ContextParamString = ExprTreeHelper.TypeParamString(typeof(AsExecutionContext));
 
         private MethodCallExpression BuildMethod(string name, string singedName, IEnumerable<MethodCallExpression> parameters)
         {
-            if (!this.rawMethod.TryGetValue(name, out var rawMethod))
+            if (!this.rawMethod.TryGetValue(name, out var rawMethods))
                 throw new UnknownMethodException(name, singedName);
 
             var signature = ExprTreeHelper.GetSignatureOf(parameters);
 
             if (!methods.TryGetValue(signature, out var method))
             {
-                var (expr, sign) = ExprTreeHelper.BuildMethod(rawMethod, parameters);
+                var (expr, sign) = ExprTreeHelper.BuildMethod(rawMethods, parameters);
                 methods.Add(sign, method = expr);
             }
             return method;
