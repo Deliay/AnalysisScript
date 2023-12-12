@@ -69,6 +69,7 @@
                             else if (current == 't') val += '\t';
                             else if (current == 's') val += ' ';
                             else if (current == 'b') val += '\b';
+                            else if (current == 'n') val += '\n';
                             else throw new InvalidTokenException(pos, $"\\{current}");
                         }
                         else val += current;

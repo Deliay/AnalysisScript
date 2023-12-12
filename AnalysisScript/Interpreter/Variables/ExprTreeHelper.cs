@@ -190,8 +190,9 @@ namespace AnalysisScript.Interpreter.Variables
 
         private static IEnumerable<(Type, Type)> ExtractTypeMapping(Type generic, Type parameter)
         {
-            var genericImplType = FindStableType(generic, parameter)
-                ?? throw new InvalidCastException($"Type mismatched, {generic} to {parameter}");
+            var genericImplType = FindStableType(generic, parameter);
+
+            if (genericImplType is null) yield break;
                 
             var genericTypes = generic.GetGenericArguments();
             var parameteredTypes = genericImplType.GetGenericArguments();
@@ -218,25 +219,27 @@ namespace AnalysisScript.Interpreter.Variables
             for (int i = 0; i < methodParameters.Length; i++)
             {
                 var genericParam = methodParameters[i];
+                var orderedParam = orderedParameter[i];
                 if (!genericParam.ParameterType.ContainsGenericParameters) continue;
     
                 if (GenericTypeToTargetType.ContainsKey(genericParam.ParameterType)) continue;
 
                 if (genericParam.ParameterType.IsGenericParameter)
                 {
-                    GenericTypeToTargetType.Add(genericParam.ParameterType, orderedParameter[i]);
+                    GenericTypeToTargetType.Add(genericParam.ParameterType, orderedParam);
                 }
                 else
                 {
-                    foreach (var (a, b) in ExtractTypeMapping(genericParam.ParameterType, orderedParameter[i]))
+                    foreach (var (a, b) in ExtractTypeMapping(genericParam.ParameterType, orderedParam))
                     {
                         GenericTypeToTargetType.Add(a, b);
                     }
                 }
             }
             
-            if (genericTypes.Any(type => !GenericTypeToTargetType.ContainsKey(type)))
-                throw new MissingMethodException($"Generic type inference doesn't support now, use LambdaExpression for instead");
+            if (genericTypes.Any(type => !GenericTypeToTargetType.ContainsKey(type))) {
+                return false;
+            }
 
             method = genericMethod.MakeGenericMethod(genericTypes.Select((type) => GenericTypeToTargetType[type]).ToArray());
 

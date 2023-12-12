@@ -7,8 +7,9 @@ using System.Threading.Tasks;
 
 namespace AnalysisScript.Interpreter
 {
-    public class AsRuntimeException(AsExecutionContext Context, Exception Inner)
-        : Exception($"{Inner.Message} \n Execution failed at line {Context.CurrentExecuteObject.LexicalToken.Line}: {Context.CurrentExecuteObject}")
+    public class AsRuntimeException(AsExecutionContext context, Exception inner)
+        : Exception($"Execution failed at line {context.CurrentExecuteObject.LexicalToken.Line}: {context.CurrentExecuteObject}\n{inner.Message}", inner)
     {
+        public AsExecutionContext Context => context;
     }
 }
