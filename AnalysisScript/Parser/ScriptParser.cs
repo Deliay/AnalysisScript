@@ -204,17 +204,7 @@ namespace AnalysisScript.Parser
 
             if (commands == null) return null;
 
-            //var constants = tokens.Where(token => token.IsConstant)
-            //    .GroupBy(token => token.Type)
-            //    .ToDictionary(group => group.Key, group => group);
-
-            //constants.TryGetValue(TokenType.String, out var stringConstantEnumerable);
-            //constants.TryGetValue(TokenType.Number, out var numberConstantEnumerable);
-
-            //var stringConstant = (stringConstantEnumerable ?? Enumerable.Empty<IToken>()).Cast<Token.String>().ToList();
-            //var numberConstant = (numberConstantEnumerable ?? Enumerable.Empty<IToken>()).Cast<Token.Number>().ToList();
-
-            return new AsAnalysis(commands); //, stringConstant, numberConstant);
+            return new AsAnalysis(commands);
         }
     }
 }

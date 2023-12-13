@@ -1,14 +1,10 @@
 ﻿using AnalysisScript.Interpreter.Variables.Method;
 using AnalysisScript.Lexical;
 using AnalysisScript.Parser.Ast.Basic;
-using AnalysisScript.Parser.Ast.Operator;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace AnalysisScript.Interpreter.Variables
 {

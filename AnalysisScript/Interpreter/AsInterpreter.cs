@@ -47,9 +47,6 @@ public class AsInterpreter : IDisposable
         foreach (var pipe in pipes)
         {
             Context.CurrentExecuteObject = pipe;
-            //var func = Methods[pipe.FunctionName.Name];
-            //var args = pipe.Arguments.Select(ValueOf).ToArray();
-            //value = await func(Context, value, args);
 
             var pipeValueGetter = Variables.GetMethodCallLambda(value, pipe.FunctionName.Name, pipe.Arguments, Context).Compile();
             var nextValue = await pipeValueGetter();
