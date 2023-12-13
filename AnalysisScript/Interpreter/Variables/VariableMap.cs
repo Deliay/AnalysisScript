@@ -16,6 +16,13 @@ public class VariableMap : IEnumerable<KeyValuePair<AsIdentity, IContainer>>
         NameMap.Add(id.Name, id);
     }
 
+    public void Update(AsIdentity newId)
+    {
+        var val = VarMap[newId];
+        VarMap.Remove(newId);
+        VarMap.Add(newId, val);
+    }
+
     public bool ContainsKey(AsIdentity id)
     {
         return VarMap.ContainsKey(id);

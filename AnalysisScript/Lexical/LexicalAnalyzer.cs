@@ -5,7 +5,7 @@
         public static IEnumerable<IToken> Analyze(string source)
         {
             if (string.IsNullOrWhiteSpace(source)) yield break;
-            int line = 0;
+            int line = 1;
             int pos = 0;
             char current;
 

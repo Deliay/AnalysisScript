@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
@@ -23,11 +24,42 @@ namespace AnalysisScript.Interpreter.Variables
 
             return type;
         }
+        private class InternEnumerableToStringHelper<T, R> where T : IEnumerable<R>
+        {
+            public static string CollectionToString(T item)
+            {
+                return $"{string.Join(',', item.Take(3))}...共{item.Count()}项";
+            }
+        }
+        private readonly static Dictionary<Type, MethodInfo> EnumerableToStringMethods = [];
+        private static MethodInfo GetEnumerableToStringMethod(Type underlying)
+        {
+            if (!EnumerableToStringMethods.TryGetValue(underlying, out var method))
+            {
+                var type = typeof(InternEnumerableToStringHelper<,>)
+                    .MakeGenericType(
+                        underlying,
+                        underlying.GenericTypeArguments[0]);
+                EnumerableToStringMethods.Add(underlying, method = type.GetMethod("CollectionToString")!);
+            }
+
+            return method;
+        }
+
         private static MethodInfo GetToStringMethod(Type underlying)
         {
             if (!TypeToString.TryGetValue(underlying, out var method))
             {
-                TypeToString.Add(underlying, method = underlying.GetRuntimeMethod("ToString", [])!);
+                if (underlying.GetMethod("ToString", []) is MethodInfo typeToString && typeToString.DeclaringType.GUID == underlying.GUID)
+                {
+                    TypeToString.Add(underlying, method = typeToString);
+                }
+                else if (FindStableType(typeof(IEnumerable<>), underlying) is Type stableIEnumerable)
+                {
+                    return null!;
+                }
+                else 
+                    TypeToString.Add(underlying, method = typeof(object).GetMethod("ToString")!);
             }
 
             return method;
@@ -84,7 +116,10 @@ namespace AnalysisScript.Interpreter.Variables
 
             var invoke = Expression.Invoke(lambda);
 
-            var callUnderlyingToString = Expression.Call(invoke, GetToStringMethod(member.Type));
+            var method = GetToStringMethod(member.Type);
+            var callUnderlyingToString = method == null
+                ? Expression.Call(GetEnumerableToStringMethod(member.Type), invoke)
+                : Expression.Call(invoke, method);
 
             var toString = Expression.Lambda<Func<T, string>>(callUnderlyingToString, parameter);
 
@@ -99,7 +134,10 @@ namespace AnalysisScript.Interpreter.Variables
 
             var invoke = Expression.Invoke(lambda);
 
-            var callUnderlyingToString = Expression.Call(invoke, GetToStringMethod(container.UnderlyingType));
+            var method = GetToStringMethod(container.UnderlyingType);
+            var callUnderlyingToString = method == null
+                ? Expression.Call(GetEnumerableToStringMethod(container.UnderlyingType), invoke)
+                : Expression.Call(invoke, method);
 
             var toString = Expression.Lambda<Func<IContainer, string>>(callUnderlyingToString, parameter);
 

@@ -53,6 +53,11 @@ namespace AnalysisScript.Interpreter.Variables
 
         public bool HasVariable(AsIdentity id) => variables.ContainsKey(id);
 
+        public void UpdateVariable(AsIdentity id)
+        {
+            variables.Update(id);
+        }
+
         public T? GetVariable<T>(AsIdentity id)
         {
             if (!variables.TryGetValue(id, out var container))

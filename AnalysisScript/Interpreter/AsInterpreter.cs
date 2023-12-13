@@ -85,6 +85,8 @@ public class AsInterpreter : IDisposable
     private ValueTask ExecuteParam(AsParam param)
     {
         if (!Variables.HasVariable(param.Variable)) throw new UnknownVariableException(param.Variable);
+        
+        Variables.UpdateVariable(param.Variable);
         return ValueTask.CompletedTask;
     }
 
