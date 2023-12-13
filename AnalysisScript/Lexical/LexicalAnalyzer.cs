@@ -5,7 +5,7 @@
         public static IEnumerable<IToken> Analyze(string source)
         {
             if (string.IsNullOrWhiteSpace(source)) yield break;
-            int line = -1;
+            int line = 0;
             int pos = 0;
             char current;
 
@@ -18,6 +18,8 @@
             do
             {
                 Peek();
+                if (current == '\n') line += 1;
+
                 if (current == '|')
                 {
                     yield return new Token.Pipe(pos, line);
@@ -85,11 +87,10 @@
                     {
                         val += current;
                     }
-                    yield return new Token.Comment(val, pos, ++line);
-                    line += 1;
+                    yield return new Token.Comment(val, pos, line);
                     yield return new Token.NewLine(pos, ++line);
                 }
-                else if (current == '\n') yield return new Token.NewLine(pos, ++line);
+                else if (current == '\n') yield return new Token.NewLine(pos, line);
                 else if (char.IsWhiteSpace(current)) continue;
                 else throw new InvalidTokenException(pos, current.ToString());
             } while (HasMore());

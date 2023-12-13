@@ -10,12 +10,13 @@ namespace AnalysisScript.Interpreter.Variables
 {
     public class VariableContext
     {
-        private readonly Dictionary<string, IContainer> variables = [];
+        public IEnumerable<KeyValuePair<AsIdentity, IContainer>> AllVariables => variables;
+        private readonly VariableMap variables = [];
         private int tempVar = 0;
         public AsIdentity AddTempVar(IContainer value, IToken token)
         {
             var id = new AsIdentity(new Token.Identity($"\"_temp_var_{++tempVar}", token.Pos, token.Line));
-            variables.Add(id.Name, value);
+            variables.Add(id, value);
             return id;
         }
         public MethodContext Methods { get; }
@@ -25,43 +26,43 @@ namespace AnalysisScript.Interpreter.Variables
             Methods = new(this);
         }
 
-        public void PutInitVariable<T>(string name, T value)
+        public void PutInitVariable<T>(AsIdentity id, T value)
         {
-            if (variables.ContainsKey(name))
-                throw new VariableAlreadyExistsException($"Initialize variable {name} already exists");
+            if (variables.ContainsKey(id))
+                throw new VariableAlreadyExistsException($"Initialize variable {id} already exists");
 
-            variables.Add(name, IContainer.Of(value));
+            variables.Add(id, IContainer.Of(value));
         }
 
         public void PutVariable<T>(AsIdentity id, T value)
         {
-            if (variables.ContainsKey(id.Name))
+            if (variables.ContainsKey(id))
                 throw new VariableAlreadyExistsException(id);
 
-            variables.Add(id.Name, IContainer.Of(value));
+            variables.Add(id, IContainer.Of(value));
         }
 
         public void PutVariableContainer(AsIdentity id, IContainer value)
         {
-            if (variables.ContainsKey(id.Name))
+            if (variables.ContainsKey(id))
                 throw new VariableAlreadyExistsException(id);
 
-            variables.Add(id.Name, value);
+            variables.Add(id, value);
         }
 
 
-        public bool HasVariable(AsIdentity id) => variables.ContainsKey(id.Name);
+        public bool HasVariable(AsIdentity id) => variables.ContainsKey(id);
 
         public T? GetVariable<T>(AsIdentity id)
         {
-            if (!variables.TryGetValue(id.Name, out var container))
+            if (!variables.TryGetValue(id, out var container))
                 throw new UnknownVariableException(id);
 
             return container.As<T>();
         }
         public IContainer GetVariableContainer(AsIdentity id)
         {
-            if (!variables.TryGetValue(id.Name, out var container))
+            if (!variables.TryGetValue(id, out var container))
                 throw new UnknownVariableException(id);
 
             return container;
@@ -70,15 +71,10 @@ namespace AnalysisScript.Interpreter.Variables
 
         public object? __Boxed_GetVariable(AsIdentity id)
         {
-            if (!variables.TryGetValue(id.Name, out var container))
+            if (!variables.TryGetValue(id, out var container))
                 throw new UnknownVariableException(id);
 
             return container.BoxedUnderlyingValue();
-        }
-
-        public void __Unsafe_UnBoxed_PutVariable(string name, object value)
-        {
-            variables.Add(name, ExprTreeHelper.UnboxToContainer(value)(value));
         }
 
         public AsIdentity Storage(AsObject @object)
@@ -87,15 +83,6 @@ namespace AnalysisScript.Interpreter.Variables
             else if (@object is AsInteger integer) return AddTempVar(IContainer.Of(integer.Value), integer.LexicalToken);
             else if (@object is AsNumber num) return AddTempVar(IContainer.Of(num.Real), num.LexicalToken);
             else if (@object is AsIdentity id) return id;
-            throw new UnknownValueObjectException(@object);
-        }
-
-        public object ValueOf(AsObject @object)
-        {
-            if (@object is AsString str) return Interpolation(str);
-            else if (@object is AsNumber num) return num.Real;
-            else if (@object is AsInteger integer) return integer.Value;
-            else if (@object is AsIdentity id) return __Boxed_GetVariable(id);
             throw new UnknownValueObjectException(@object);
         }
 

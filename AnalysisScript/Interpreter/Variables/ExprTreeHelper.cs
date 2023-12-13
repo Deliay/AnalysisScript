@@ -115,6 +115,22 @@ namespace AnalysisScript.Interpreter.Variables
             return () => rawFunc(container);
         }
 
+        
+        public static Func<T> ValueCastTo<T>(IContainer container)
+        {
+            var (parameter, value) = UnderlyingValueExpr(container);
+
+            if (!value.Type.IsAssignableTo(typeof(T)))
+                throw new InvalidCastException();
+
+            var cast = Expression.TypeAs(value, typeof(T));
+
+            var rawFunc = Expression.Lambda<Func<IContainer, T>>(cast, parameter).Compile();
+
+            return () => rawFunc(container);
+        }
+
+
         public static IContainer SanitizeIdentityMethodCallExpression(MethodCallExpression expr)
         {
             if (!(expr.Method == MakeIndentity(expr.Method.ReturnType)))

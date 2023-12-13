@@ -23,6 +23,7 @@ namespace AnalysisScript.Interpreter.Variables
 
         public T? As<T>() => ((Container<T>)this).Value;
 
+        public T ValueCastTo<T>() => ExprTreeHelper.ValueCastTo<T>(this)();
 
         public string? UnerlyingToString() => ExprTreeHelper.ExprToString(this);
 

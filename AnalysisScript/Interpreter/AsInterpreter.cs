@@ -11,7 +11,7 @@ namespace AnalysisScript.Interpreter;
 
 public class AsInterpreter : IDisposable
 {
-    private VariableContext Variables { get; } = new();
+    public VariableContext Variables { get; } = new();
     public IContainer? Return { get; private set; }
     public string LastComment { get; private set; } = "";
     public string CurrentCommand { get; private set; } = "";
@@ -102,7 +102,7 @@ public class AsInterpreter : IDisposable
 
     public AsInterpreter AddVariable<T>(string name, T value)
     {
-        Variables.PutInitVariable(name, value);
+        Variables.PutInitVariable(new AsIdentity(new Lexical.Token.Identity(name, 0, 0)), value);
         return this;
     }
     
@@ -111,7 +111,7 @@ public class AsInterpreter : IDisposable
         await Run(token);
         if (Return is not null)
         {
-            return Return.As<T>();
+            return Return.ValueCastTo<T>();
         }
 
         return default;
