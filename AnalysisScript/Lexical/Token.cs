@@ -71,5 +71,11 @@
             public readonly TokenType Type => TokenType.Number;
             public bool IsConstant { get; } = true;
         }
+
+        public record struct Integer(int Value, int Pos, int Line) : IToken
+        {
+            public readonly TokenType Type => TokenType.Integer;
+            public bool IsConstant { get; } = true;
+        }
     }
 }

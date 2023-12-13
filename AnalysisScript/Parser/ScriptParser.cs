@@ -99,9 +99,10 @@ namespace AnalysisScript.Parser
 
         private static AsObject ReadArgument(IEnumerator<IToken> reader)
         {
-            reader.Require(TokenType.Number, TokenType.String, TokenType.Identity);
+            reader.Require(TokenType.Number, TokenType.Integer, TokenType.String, TokenType.Identity);
             return reader.Current.Type switch
             {
+                TokenType.Integer => new AsInteger((Token.Integer)reader.Current),
                 TokenType.Number => new AsNumber((Token.Number)reader.Current),
                 TokenType.String => new AsString((Token.String)reader.Current),
                 TokenType.Identity => new AsIdentity((Token.Identity)reader.Current),
@@ -111,10 +112,11 @@ namespace AnalysisScript.Parser
 
         private static AsObject MoveNextAndReadArgument(IEnumerator<IToken> reader)
         {
-            reader.MoveNextAndRequire(TokenType.Number, TokenType.String, TokenType.Identity);
+            reader.MoveNextAndRequire(TokenType.Number, TokenType.Integer, TokenType.String, TokenType.Identity);
             return reader.Current.Type switch
             {
                 TokenType.Number => new AsNumber((Token.Number)reader.Current),
+                TokenType.Integer => new AsInteger((Token.Integer)reader.Current),
                 TokenType.String => new AsString((Token.String)reader.Current),
                 TokenType.Identity => new AsIdentity((Token.Identity)reader.Current),
                 _ => throw new InvalidDataException(),
@@ -123,7 +125,7 @@ namespace AnalysisScript.Parser
 
         private static IEnumerable<AsObject> ReadArguments(this IEnumerator<IToken> reader)
         {
-            while (reader.MoveNextAndIs(TokenType.Number, TokenType.String, TokenType.Identity))
+            while (reader.MoveNextAndIs(TokenType.Number, TokenType.Integer, TokenType.String, TokenType.Identity))
             {
                 yield return ReadArgument(reader);
             }

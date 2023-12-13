@@ -28,22 +28,24 @@
                 }
                 else if (char.IsNumber(current))
                 {
-                    double real = char.GetNumericValue(current);
+                    int integer = current - '0';
                     while (HasMore() && char.IsNumber(Peek()))
                     {
-                        real *= 10;
-                        real += char.GetNumericValue(current);
+                        integer *= 10;
+                        integer += current - '0';
                     }
                     if (current == '.' && HasMore())
                     {
+                        double real = integer;
                         double d = 10;
                         while (HasMore() && char.IsNumber(Peek()))
                         {
                             real += char.GetNumericValue(current) / d;
                             d *= 10;
                         }
+                        yield return new Token.Number(real, pos, line);
                     }
-                    yield return new Token.Number(real, pos, line);
+                    yield return new Token.Integer(integer, pos, line);
                 }
                 else if (IsIdentityStart(current))
                 {

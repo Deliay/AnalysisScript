@@ -147,12 +147,19 @@ namespace AnalysisScript.Library
             return await res.Content.ReadFromJsonAsync<Response>();
         }
 
-        public static T ThrowIfNull<T>(T instance) => instance ?? throw new NullReferenceException();
-        public static IEnumerable<T> ThrowIfEmpty<T>(IEnumerable<T> instance) => !instance.Any() ? instance : throw new NullReferenceException();
-        public static string ThrowIfEmptyString(string instance) => instance.Length == 0 ? instance : throw new NullReferenceException();
+        public static IEnumerable<T> Take<T>(AsExecutionContext ctx, IEnumerable<T> source, int count) => source.Take(count);
+        public static IEnumerable<T> Skip<T>(AsExecutionContext ctx, IEnumerable<T> source, int count) => source.Skip(count);
+
+        public static T ThrowIfNull<T>(AsExecutionContext ctx, T instance) => instance ?? throw new NullReferenceException();
+        public static IEnumerable<T> ThrowIfEmpty<T>(AsExecutionContext ctx, IEnumerable<T> instance) => !instance.Any() ? instance : throw new NullReferenceException();
+        public static string ThrowIfEmptyString(AsExecutionContext ctx, string instance) => instance.Length == 0 ? instance : throw new NullReferenceException();
 
         public static AsInterpreter RegisterBasicFunctionsV2(this AsInterpreter interpreter)
         {
+            interpreter.RegisterStaticFunction("limit", typeof(BasicFunctionV2).GetMethod(nameof(Take)));
+            interpreter.RegisterStaticFunction("take", typeof(BasicFunctionV2).GetMethod(nameof(Take)));
+            interpreter.RegisterStaticFunction("skip", typeof(BasicFunctionV2).GetMethod(nameof(Skip)));
+
             interpreter.RegisterStaticFunction("select", typeof(BasicFunctionV2).GetMethod(nameof(SelectSingle)));
             interpreter.RegisterStaticFunction("select", typeof(BasicFunctionV2).GetMethod(nameof(SelectSequence)));
             interpreter.RegisterStaticFunction("join", typeof(BasicFunctionV2).GetMethod(nameof(Join)));

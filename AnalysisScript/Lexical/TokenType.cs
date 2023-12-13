@@ -13,6 +13,7 @@
         Identity,
         String,
         Number,
+        Integer,
         Return,
     }
 }

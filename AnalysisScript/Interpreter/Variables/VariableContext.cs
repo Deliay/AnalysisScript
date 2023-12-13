@@ -88,6 +88,7 @@ namespace AnalysisScript.Interpreter.Variables
         public AsIdentity Storage(AsObject @object)
         {
             if (@object is AsString str) return AddTempVar(IContainer.Of(Interpolation(str)), str.LexicalToken);
+            else if (@object is AsInteger integer) return AddTempVar(IContainer.Of(integer.Value), integer.LexicalToken);
             else if (@object is AsNumber num) return AddTempVar(IContainer.Of(num.Real), num.LexicalToken);
             else if (@object is AsIdentity id) return id;
             throw new UnknownValueObjectException(@object);
@@ -97,6 +98,7 @@ namespace AnalysisScript.Interpreter.Variables
         {
             if (@object is AsString str) return Interpolation(str);
             else if (@object is AsNumber num) return num.Real;
+            else if (@object is AsInteger integer) return integer.Value;
             else if (@object is AsIdentity id) return __Boxed_GetVariable(id);
             throw new UnknownValueObjectException(@object);
         }
@@ -104,6 +106,7 @@ namespace AnalysisScript.Interpreter.Variables
         public MethodCallExpression LambdaValueOf(AsObject @object)
         {
             if (@object is AsString str) return ExprTreeHelper.GetConstantValueLambda(Interpolation(str));
+            else if (@object is AsInteger integer) return ExprTreeHelper.GetConstantValueLambda(integer.Value);
             else if (@object is AsNumber num) return ExprTreeHelper.GetConstantValueLambda(num.Real);
             else if (@object is AsIdentity id) return ExprTreeHelper.GetContainerValueLambda(GetVariableContainer(id));
             throw new UnknownValueObjectException(@object);
