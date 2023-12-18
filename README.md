@@ -15,7 +15,7 @@ AsInterpreter interpreter = new AsInterpreter(ast)
 var result = await interpreter.RunAndReturn<string>();
 
 Console.WriteLine(result);
-// Output: result is: ab,ac
+// Output: result is: ab|ac
 ```
 
 ```
