@@ -20,8 +20,8 @@ jobs:
     - name: Build
       run: dotnet pack
     - name: publish-to-nuget
-      run: dotnet nuget push **/*.nupkg --api-key=${{secret.NUGET_KEY}} --skip-duplicate --source=https://api.nuget.org/v3/index.json
+      run: dotnet nuget push **/*.nupkg --api-key=${{secrets.NUGET_KEY}} --skip-duplicate --source=https://api.nuget.org/v3/index.json
     - name: publish-to-github
-      run: dotnet nuget push **/*.nupkg --api-key=${{secret.GITHUB_TOKEN}} --skip-duplicate --source=https://nuget.pkg.github.com/Deliay/index.json
+      run: dotnet nuget push **/*.nupkg --api-key=${{secrets.GITHUB_TOKEN}} --skip-duplicate --source=https://nuget.pkg.github.com/Deliay/index.json
       
         
