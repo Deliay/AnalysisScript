@@ -138,17 +138,19 @@ namespace AnalysisScript.Library
             => values.ToHashSet();
 
         public record struct Response(int code, string msg);
-        public static async ValueTask<Response> GetUrl(AsExecutionContext executionContext, string @this)
+        public static async ValueTask<Response> Post<T>(AsExecutionContext executionContext, T body, string address)
         {
             using var req = new HttpClient();
 
-            var res = await req.PostAsync("https://app.mokahr.com/success", null);
+            var res = await req.PostAsJsonAsync("https://app.mokahr.com/success", body);
 
             return await res.Content.ReadFromJsonAsync<Response>();
         }
 
         public static IEnumerable<T> Take<T>(AsExecutionContext ctx, IEnumerable<T> source, int count) => source.Take(count);
         public static IEnumerable<T> Skip<T>(AsExecutionContext ctx, IEnumerable<T> source, int count) => source.Skip(count);
+
+        public static string[] Split(AsExecutionContext ctx, string source, string splitter) => source.Split(splitter);
 
         public static T ThrowIfNull<T>(AsExecutionContext ctx, T instance) => instance ?? throw new NullReferenceException();
         public static IEnumerable<T> ThrowIfEmpty<T>(AsExecutionContext ctx, IEnumerable<T> instance) => !instance.Any() ? instance : throw new NullReferenceException();
@@ -188,7 +190,9 @@ namespace AnalysisScript.Library
             interpreter.RegisterStaticFunction("not_empty", typeof(BasicFunctionV2).GetMethod(nameof(ThrowIfEmptyString)));
 
             interpreter.RegisterStaticFunction("json", typeof(BasicFunctionV2).GetMethod(nameof(Json)));
-            interpreter.RegisterStaticFunction("test_get_url", typeof(BasicFunctionV2).GetMethod(nameof(GetUrl)));
+            interpreter.RegisterStaticFunction("post", typeof(BasicFunctionV2).GetMethod(nameof(Post)));
+
+            interpreter.RegisterStaticFunction("split", typeof(BasicFunctionV2).GetMethod(nameof(Split)));
             return interpreter;
         }
     }
