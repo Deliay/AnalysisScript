@@ -15,7 +15,6 @@ public class AsInterpreter : IDisposable
     public IContainer? Return { get; private set; }
     public string LastComment { get; private set; } = "";
     public string CurrentCommand { get; private set; } = "";
-    public AsExecutionContext Context { get; }
     public AsAnalysis Tree { get; }
 
     public event Action<string>? OnCommentUpdate;
@@ -26,7 +25,6 @@ public class AsInterpreter : IDisposable
 
     public AsInterpreter(AsAnalysis tree)
     {
-        this.Context = new AsExecutionContext(Logging);
         Tree = tree;
     }
 
@@ -35,7 +33,7 @@ public class AsInterpreter : IDisposable
         OnLogging?.Invoke(message);
     }
 
-    private async ValueTask<AsIdentity> RunPipe(List<AsPipe> pipes, AsObject initialValue)
+    private async ValueTask<AsIdentity> RunPipe(AsExecutionContext ctx, List<AsPipe> pipes, AsObject initialValue)
     {
         var initialValueId = Variables.Storage(initialValue);
         if (pipes.Count == 0) return initialValueId;
@@ -46,9 +44,9 @@ public class AsInterpreter : IDisposable
         var lastValueId = initialValueId;
         foreach (var pipe in pipes)
         {
-            Context.CurrentExecuteObject = pipe;
+            ctx.CurrentExecuteObject = pipe;
 
-            var pipeValueGetter = Variables.GetMethodCallLambda(value, pipe.FunctionName.Name, pipe.Arguments, Context).Compile();
+            var pipeValueGetter = Variables.GetMethodCallLambda(value, pipe.FunctionName.Name, pipe.Arguments, ctx).Compile();
             var nextValue = await pipeValueGetter();
             var sanitizedValue = await ExprTreeHelper.SanitizeLambdaExpression(nextValue);
             
@@ -58,9 +56,9 @@ public class AsInterpreter : IDisposable
         return lastValueId;
     }
 
-    private async ValueTask ExecuteLet(AsLet let)
+    private async ValueTask ExecuteLet(AsExecutionContext ctx, AsLet let)
     {
-        var runtimeValue = await RunPipe(let.Pipes, let.Arg);
+        var runtimeValue = await RunPipe(ctx, let.Pipes, let.Arg);
         this.Variables.PutVariableContainer(let.Name, Variables.GetVariableContainer(runtimeValue));
     }
 
@@ -108,9 +106,14 @@ public class AsInterpreter : IDisposable
         return this;
     }
     
-    public async ValueTask<T?> RunAndReturn<T>(CancellationToken token)
+    public ValueTask<T?> RunAndReturn<T>(CancellationToken token)
     {
-        await Run(token);
+        return RunAndReturn<T>(new AsExecutionContext(Logging, token));
+    }
+
+    public async ValueTask<T?> RunAndReturn<T>(AsExecutionContext ctx)
+    {
+        await Run(ctx);
         if (Return is not null)
         {
             return Return.ValueCastTo<T>();
@@ -119,12 +122,12 @@ public class AsInterpreter : IDisposable
         return default;
     }
 
-    private async ValueTask RunCommand(AsCommand cmd, CancellationToken token = default)
+    private async ValueTask RunCommand(AsExecutionContext ctx, AsCommand cmd)
     {
         CurrentCommand = cmd?.ToString()!;
         OnCommandUpdate?.Invoke(CurrentCommand);
 
-        Context.CurrentExecuteObject = cmd;
+        ctx.CurrentExecuteObject = cmd;
 
         if (cmd.Type == CommandType.Comment && cmd is AsComment comment)
         {
@@ -132,7 +135,7 @@ public class AsInterpreter : IDisposable
         }
         else if (cmd.Type == CommandType.Let && cmd is AsLet let)
         {
-            await ExecuteLet(let);
+            await ExecuteLet(ctx, let);
         }
         else if (cmd.Type == CommandType.Ui && cmd is AsUi ui)
         {
@@ -149,17 +152,22 @@ public class AsInterpreter : IDisposable
         else throw new UnknownCommandException(cmd);
     }
 
-    public async ValueTask Run(CancellationToken token = default) {
+
+    public ValueTask Run(CancellationToken token = default) {
+        return Run(new AsExecutionContext(Logging, token));
+    }
+
+    public async ValueTask Run(AsExecutionContext ctx) {
         try
         {
             foreach (var cmd in Tree.Commands)
             {
-                await RunCommand(cmd, token);
+                await RunCommand(ctx, cmd);
             }
         }
         catch (Exception ex) 
         {
-            throw new AsRuntimeException(Context, ex);
+            throw new AsRuntimeException(ctx, ex);
         }
     }
 
