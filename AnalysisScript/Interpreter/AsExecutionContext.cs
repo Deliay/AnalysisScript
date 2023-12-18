@@ -15,7 +15,7 @@ namespace AnalysisScript.Interpreter
         }
         public Action<string> Logger { get; } = logger ?? ((_) => { });
 
-        public AsObject CurrentExecuteObject { get; internal set; }
+        public AsObject? CurrentExecuteObject { get; internal set; }
 
         public CancellationToken CancelToken => cancellationToken;
     }
