@@ -156,43 +156,40 @@ namespace AnalysisScript.Library
         public static IEnumerable<T> ThrowIfEmpty<T>(AsExecutionContext ctx, IEnumerable<T> instance) => !instance.Any() ? instance : throw new NullReferenceException();
         public static string ThrowIfEmptyString(AsExecutionContext ctx, string instance) => instance.Length == 0 ? instance : throw new NullReferenceException();
 
+        private static Dictionary<string, MethodInfo> Methods = new()
+        {
+            { "limit", typeof(BasicFunctionV2).GetMethod(nameof(Take)) },
+            { "take", typeof(BasicFunctionV2).GetMethod(nameof(Take)) },
+            { "skip", typeof(BasicFunctionV2).GetMethod(nameof(Skip)) },
+            { "select", typeof(BasicFunctionV2).GetMethod(nameof(SelectSingle)) },
+            { "select", typeof(BasicFunctionV2).GetMethod(nameof(SelectSequence)) },
+            { "join", typeof(BasicFunctionV2).GetMethod(nameof(Join)) },
+            { "filter_contains", typeof(BasicFunctionV2).GetMethod(nameof(FilterContains)) },
+            { "filter_contains", typeof(BasicFunctionV2).GetMethod(nameof(FilterContainsString)) },
+            { "filter_regex", typeof(BasicFunctionV2).GetMethod(nameof(FilterContainsRegex)) },
+            { "filter_regex", typeof(BasicFunctionV2).GetMethod(nameof(FilterContainsStringRegex)) },
+            { "filter_not_contains", typeof(BasicFunctionV2).GetMethod(nameof(FilterNotContains)) },
+            { "filter_not_contains", typeof(BasicFunctionV2).GetMethod(nameof(FilterNotContainsString)) },
+            { "filter_not_regex", typeof(BasicFunctionV2).GetMethod(nameof(FilterNotContainsRegex)) },
+            { "filter_not_regex", typeof(BasicFunctionV2).GetMethod(nameof(FilterNotContainsStringRegex)) },
+            { "group", typeof(BasicFunctionV2).GetMethod(nameof(Group)) },
+            { "group", typeof(BasicFunctionV2).GetMethod(nameof(GroupString)) },
+            { "distinct", typeof(BasicFunctionV2).GetMethod(nameof(Group)) },
+            { "distinct", typeof(BasicFunctionV2).GetMethod(nameof(GroupString)) },
+            { "not_null", typeof(BasicFunctionV2).GetMethod(nameof(ThrowIfNull)) },
+            { "not_empty", typeof(BasicFunctionV2).GetMethod(nameof(ThrowIfNull)) },
+            { "not_empty", typeof(BasicFunctionV2).GetMethod(nameof(ThrowIfEmptyString)) },
+            { "json", typeof(BasicFunctionV2).GetMethod(nameof(Json)) },
+            { "post", typeof(BasicFunctionV2).GetMethod(nameof(Post)) },
+            { "split", typeof(BasicFunctionV2).GetMethod(nameof(Split)) },
+        };
+
         public static AsInterpreter RegisterBasicFunctionsV2(this AsInterpreter interpreter)
         {
-            interpreter.RegisterStaticFunction("limit", typeof(BasicFunctionV2).GetMethod(nameof(Take)));
-            interpreter.RegisterStaticFunction("take", typeof(BasicFunctionV2).GetMethod(nameof(Take)));
-            interpreter.RegisterStaticFunction("skip", typeof(BasicFunctionV2).GetMethod(nameof(Skip)));
-
-            interpreter.RegisterStaticFunction("select", typeof(BasicFunctionV2).GetMethod(nameof(SelectSingle)));
-            interpreter.RegisterStaticFunction("select", typeof(BasicFunctionV2).GetMethod(nameof(SelectSequence)));
-            interpreter.RegisterStaticFunction("join", typeof(BasicFunctionV2).GetMethod(nameof(Join)));
-
-            interpreter.RegisterStaticFunction("filter_contains", typeof(BasicFunctionV2).GetMethod(nameof(FilterContains)));
-            interpreter.RegisterStaticFunction("filter_contains", typeof(BasicFunctionV2).GetMethod(nameof(FilterContainsString)));
-
-            interpreter.RegisterStaticFunction("filter_regex", typeof(BasicFunctionV2).GetMethod(nameof(FilterContainsRegex)));
-            interpreter.RegisterStaticFunction("filter_regex", typeof(BasicFunctionV2).GetMethod(nameof(FilterContainsStringRegex)));
-
-            interpreter.RegisterStaticFunction("filter_not_contains", typeof(BasicFunctionV2).GetMethod(nameof(FilterNotContains)));
-            interpreter.RegisterStaticFunction("filter_not_contains", typeof(BasicFunctionV2).GetMethod(nameof(FilterNotContainsString)));
-
-            interpreter.RegisterStaticFunction("filter_not_regex", typeof(BasicFunctionV2).GetMethod(nameof(FilterNotContainsRegex)));
-            interpreter.RegisterStaticFunction("filter_not_regex", typeof(BasicFunctionV2).GetMethod(nameof(FilterNotContainsStringRegex)));
-
-            interpreter.RegisterStaticFunction("group", typeof(BasicFunctionV2).GetMethod(nameof(Group)));
-            interpreter.RegisterStaticFunction("group", typeof(BasicFunctionV2).GetMethod(nameof(GroupString)));
-
-            interpreter.RegisterStaticFunction("distinct", typeof(BasicFunctionV2).GetMethod(nameof(Group)));
-            interpreter.RegisterStaticFunction("distinct", typeof(BasicFunctionV2).GetMethod(nameof(GroupString)));
-
-            interpreter.RegisterStaticFunction("not_null", typeof(BasicFunctionV2).GetMethod(nameof(ThrowIfNull)));
-
-            interpreter.RegisterStaticFunction("not_empty", typeof(BasicFunctionV2).GetMethod(nameof(ThrowIfNull)));
-            interpreter.RegisterStaticFunction("not_empty", typeof(BasicFunctionV2).GetMethod(nameof(ThrowIfEmptyString)));
-
-            interpreter.RegisterStaticFunction("json", typeof(BasicFunctionV2).GetMethod(nameof(Json)));
-            interpreter.RegisterStaticFunction("post", typeof(BasicFunctionV2).GetMethod(nameof(Post)));
-
-            interpreter.RegisterStaticFunction("split", typeof(BasicFunctionV2).GetMethod(nameof(Split)));
+            foreach (var (key, value) in Methods)
+            {
+                interpreter.RegisterStaticFunction(key, value);
+            }
             return interpreter;
         }
     }
