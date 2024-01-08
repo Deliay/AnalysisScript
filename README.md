@@ -1,7 +1,9 @@
 # Analysis Script
 A super mini script for log analysis
 
-## Example (with BasicFunctionV2)
+## Examples
+
+### Basic usage (with BFL)
 ```c#
 using AnalysisScript.Library;
 
@@ -31,11 +33,41 @@ let d = "${b}${a}"
 return d
 ```
 
+### All grammar example
+```
+# define variable 'a'
+param a
+
+let b = arg1
+| ... call functions ...
+| fn arg2 arg3
+| fn2 arg2
+| fn...
+
+call fn3 arg1 arg2 arg3
+
+# declare variable set by 'fn3'
+param c
+
+let d = "string interpolation ${c}"
+let e = "string ${c} interpolation"
+let f = "${c} string interpolation"
+
+# List<String> {d, e, f}
+let g = [d, e, f]
+
+return d
+```
+
 ## Grammar
 ```
 param -> identity
 
-argument -> number | string | identity
+arr -> param
+
+arrs -> '[' arrs arr ',' | empty ']'
+
+argument -> number | string | identity | arrs
 
 arguments -> arguments argument
 
