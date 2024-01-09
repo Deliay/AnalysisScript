@@ -29,9 +29,9 @@
             public readonly TokenType Type => TokenType.Pipe;
             public bool IsConstant { get; } = false;
         }
-        public record struct Ui(int Pos, int Line) : IToken
+        public record struct Call(int Pos, int Line) : IToken
         {
-            public readonly TokenType Type => TokenType.Ui;
+            public readonly TokenType Type => TokenType.Call;
             public bool IsConstant { get; } = false;
         }
         public record struct Let(int Pos, int Line) : IToken

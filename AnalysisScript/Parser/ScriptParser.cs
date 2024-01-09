@@ -162,21 +162,21 @@ namespace AnalysisScript.Parser
 
             return pipes == null || pipes.Count == 0
                 ? throw new InvalidGrammarException(reader.Current, TokenType.Pipe)
-                : new AsUi((Token.Ui)lex, pipes);
+                : new AsUi((Token.Call)lex, pipes);
         }
 
         private static IEnumerable<AsCommand> ReadCommands(IEnumerator<IToken> reader)
         {
-            reader.MoveNextAndRequire(TokenType.Let, TokenType.Comment, TokenType.Ui, TokenType.NewLine, TokenType.Return, TokenType.Param);
+            reader.MoveNextAndRequire(TokenType.Let, TokenType.Comment, TokenType.Call, TokenType.NewLine, TokenType.Return, TokenType.Param);
             while (true)
             {
                 if (reader.Current.Type == TokenType.Let) yield return ReadLet(reader);
                 else if (reader.Current.Type == TokenType.Comment) yield return ReadComment(reader);
-                else if (reader.Current.Type == TokenType.Ui) yield return ReadUi(reader);
+                else if (reader.Current.Type == TokenType.Call) yield return ReadUi(reader);
                 else if (reader.Current.Type == TokenType.NewLine) { if (!reader.MoveNext()) break; }
                 else if (reader.Current.Type == TokenType.Return) yield return reader.ReadReturn();
                 else if (reader.Current.Type == TokenType.Param) yield return reader.ReadParam();
-                else throw new InvalidGrammarException(reader.Current, TokenType.Let, TokenType.Comment, TokenType.Ui, TokenType.NewLine, TokenType.Return, TokenType.Param);
+                else throw new InvalidGrammarException(reader.Current, TokenType.Let, TokenType.Comment, TokenType.Call, TokenType.NewLine, TokenType.Return, TokenType.Param);
             }
         }
 

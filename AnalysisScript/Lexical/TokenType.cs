@@ -9,7 +9,7 @@
         END = '\xFF',
         Param,
         Let,
-        Ui,
+        Call,
         Identity,
         String,
         Number,

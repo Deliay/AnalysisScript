@@ -10,9 +10,9 @@ using System.Threading.Tasks;
 namespace AnalysisScript.Parser.Ast.Command
 {
     public class AsUi(
-        Token.Ui lexical,
+        Token.Call lexical,
         List<AsPipe> pipes)
-        : AsCommand<Token.Ui>(lexical, CommandType.Ui)
+        : AsCommand<Token.Call>(lexical, CommandType.Ui)
     {
         public List<AsPipe> Pipes => pipes;
 
