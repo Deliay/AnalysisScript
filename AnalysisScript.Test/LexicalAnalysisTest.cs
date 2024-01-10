@@ -6,7 +6,7 @@ public class LexicalAnalysisTest
 {
     [Fact]
     public void WillSkipLf()
-    {
+    { 
         var tokens = LexicalAnalyzer.Analyze("\n|\n");
         Assert.All(tokens, (token, i) =>
         {
@@ -23,140 +23,157 @@ public class LexicalAnalysisTest
         Assert.True(tokens.Count() > 2);
     }
     [Fact]
-    public void CanResolvePipeCorrectly()
+    public void CanResolvePipe()
     {
         var tokens = LexicalAnalyzer.Analyze("|");
         Assert.Contains(tokens, token => token.Type == TokenType.Pipe);
+        Assert.Equal(2, tokens.Count());
     }
     [Fact]
-    public void CanResolveEqualCorrectly()
+    public void CanResolveEqual()
     {
         var tokens = LexicalAnalyzer.Analyze("=");
         Assert.Contains(tokens, token => token.Type == TokenType.Equal);
+        Assert.Equal(2, tokens.Count());
     }
     [Fact]
-    public void CanResolveRealNumberCorrectly()
+    public void CanResolveRealNumber()
     {
         double num = 1234.567;
         var tokens = LexicalAnalyzer.Analyze($"{num}");
         Assert.Contains(tokens, token => token.Type == TokenType.Number);
         Assert.Equal(num, tokens.Cast<Token.Number>().First().Real);
+        Assert.Equal(2, tokens.Count());
     }
     [Fact]
-    public void CanResolveIntegerNumberCorrectly()
+    public void CanResolveIntegerNumber()
     {
         int num = 1234;
         var tokens = LexicalAnalyzer.Analyze($"{num}");
         Assert.Contains(tokens, token => token.Type == TokenType.Integer);
         Assert.Equal(num, tokens.Cast<Token.Integer>().First().Value);
+        Assert.Equal(2, tokens.Count());
     }
     [Fact]
-    public void CanResolveIdentityCorrectly()
+    public void CanResolveIdentity()
     {
-        string id = "CanResolveIdentityCorrectly";
+        string id = "CanResolveIdentity";
         var tokens = LexicalAnalyzer.Analyze(id);
         Assert.Contains(tokens, token => token.Type == TokenType.Identity);
         Assert.Equal(id, tokens.Cast<Token.Identity>().First().Word);
+        Assert.Equal(2, tokens.Count());
     }
     [Fact]
-    public void CanResolve_IdentityCorrectly()
+    public void CanResolve_Identity()
     {
-        string id = "_CanResolve_IdentityCorrectly";
+        string id = "_CanResolve_Identity";
         var tokens = LexicalAnalyzer.Analyze(id);
         Assert.Contains(tokens, token => token.Type == TokenType.Identity);
         Assert.Equal(id, tokens.Cast<Token.Identity>().First().Word);
+        Assert.Equal(2, tokens.Count());
     }
     [Fact]
-    public void CanResolveLetIdentityCorrectly()
+    public void CanResolveLetIdentity()
     {
         string id = "let";
         var tokens = LexicalAnalyzer.Analyze(id);
         Assert.Contains(tokens, token => token.Type == TokenType.Let);
+        Assert.Equal(2, tokens.Count());
     }
     [Fact]
-    public void CanResolveParamIdentityCorrectly()
+    public void CanResolveParamIdentity()
     {
         string id = "param";
         var tokens = LexicalAnalyzer.Analyze(id);
         Assert.Contains(tokens, token => token.Type == TokenType.Param);
+        Assert.Equal(2, tokens.Count());
     }
     [Fact]
-    public void CanResolveCallIdentityCorrectly()
+    public void CanResolveCallIdentity()
     {
         string id = "call";
         var tokens = LexicalAnalyzer.Analyze(id);
         Assert.Contains(tokens, token => token.Type == TokenType.Call);
+        Assert.Equal(2, tokens.Count());
     }
     [Fact]
-    public void CanResolveReturnIdentityCorrectly()
+    public void CanResolveReturnIdentity()
     {
         string id = "return";
         var tokens = LexicalAnalyzer.Analyze(id);
         Assert.Contains(tokens, token => token.Type == TokenType.Return);
+        Assert.Equal(2, tokens.Count());
     }
     [Fact]
-    public void CanResolveLiteralStringCorrectly()
+    public void CanResolveLiteralString()
     {
         string id = "1234";
         var tokens = LexicalAnalyzer.Analyze($"\"{id}\"");
         Assert.Contains(tokens, token => token.Type == TokenType.String);
         Assert.Equal(id, tokens.Cast<Token.String>().First().Word);
+        Assert.Equal(2, tokens.Count());
     }
     [Fact]
-    public void CanResolveLiteralStringQuoteEscapeCorrectly()
+    public void CanResolveLiteralStringQuoteEscape()
     {
         string id = "\\\"1234";
         string except = "\"1234";
         var tokens = LexicalAnalyzer.Analyze($"\"{id}\"");
         Assert.Contains(tokens, token => token.Type == TokenType.String);
         Assert.Equal(except, tokens.Cast<Token.String>().First().Word);
+        Assert.Equal(2, tokens.Count());
     }
     [Fact]
-    public void CanResolveLiteralStringTabEscapeCorrectly()
+    public void CanResolveLiteralStringTabEscape()
     {
         string id = "\\t1234";
         string except = "\t1234";
         var tokens = LexicalAnalyzer.Analyze($"\"{id}\"");
         Assert.Contains(tokens, token => token.Type == TokenType.String);
         Assert.Equal(except, tokens.Cast<Token.String>().First().Word);
+        Assert.Equal(2, tokens.Count());
     }
     [Fact]
-    public void CanResolveLiteralStringSpaceEscapeCorrectly()
+    public void CanResolveLiteralStringSpaceEscape()
     {
         string id = "\\s1234";
         string except = " 1234";
         var tokens = LexicalAnalyzer.Analyze($"\"{id}\"");
         Assert.Contains(tokens, token => token.Type == TokenType.String);
         Assert.Equal(except, tokens.Cast<Token.String>().First().Word);
+        Assert.Equal(2, tokens.Count());
     }
     [Fact]
-    public void CanResolveLiteralStringBackspaceEscapeCorrectly()
+    public void CanResolveLiteralStringBackspaceEscape()
     {
         string id = "\\b1234";
         string except = "\b1234";
         var tokens = LexicalAnalyzer.Analyze($"\"{id}\"");
         Assert.Contains(tokens, token => token.Type == TokenType.String);
         Assert.Equal(except, tokens.Cast<Token.String>().First().Word);
+        Assert.Equal(2, tokens.Count());
     }
     [Fact]
-    public void CanResolveLiteralStringLfEscapeCorrectly()
+    public void CanResolveLiteralStringLfEscape()
     {
         string id = "\\n1234";
         string except = "\n1234";
         var tokens = LexicalAnalyzer.Analyze($"\"{id}\"");
         Assert.Contains(tokens, token => token.Type == TokenType.String);
         Assert.Equal(except, tokens.Cast<Token.String>().First().Word);
+        Assert.Equal(2, tokens.Count());
     }
     [Fact]
-    public void CanResolveCommentCorrectly()
+    public void CanResolveComment()
     {
         string comment = " 114514";
         var tokens = LexicalAnalyzer.Analyze($"#{comment}");
         Assert.Contains(tokens, token => token.Type == TokenType.Comment);
         Assert.Equal(comment, tokens.Cast<Token.Comment>().First().Word);
+        Assert.Equal(3, tokens.Count());
     }
     [Fact]
-    public void CanSkipSpaceCorrectly()
+    public void CanSkipSpace()
     {
         var tokens = LexicalAnalyzer.Analyze("|            \"123\"\n#123\n123");
         Assert.All(tokens, (token, i) =>

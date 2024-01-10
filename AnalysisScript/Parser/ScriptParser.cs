@@ -25,6 +25,12 @@ namespace AnalysisScript.Parser
 
             return types.Any(type => type == reader.Current.Type);
         }
+        private static bool MoveNextIfIsOrEof(this IEnumerator<IToken> reader, params TokenType[] types)
+        {
+            if (reader.Is(types))
+                return reader.MoveNext();
+            else return false;
+        }
         private static IEnumerator<IToken> Require(this IEnumerator<IToken> reader, params TokenType[] types)
         {
             if (!reader.Is(types))
@@ -77,7 +83,7 @@ namespace AnalysisScript.Parser
             return new AsIdentity(token);
         }
 
-
+        private static TokenType[] SkipTypes = [TokenType.NewLine, TokenType.Comment];
         private static IEnumerable<AsPipe> EnumeratePipes(this IEnumerator<IToken> reader)
         {
             while (reader.Is(TokenType.Pipe))
@@ -86,7 +92,12 @@ namespace AnalysisScript.Parser
                 var identity = reader.NextAndReadIdentity();
                 var arguments = reader.ReadArguments().ToList();
                 yield return new AsPipe((Token.Pipe)lex, identity, arguments);
-                reader.RequireAndMoveNext(TokenType.NewLine, TokenType.Comment);
+                if (reader.Is(TokenType.Pipe)) continue;
+                if (!reader.MoveNextIfIsOrEof(TokenType.NewLine, TokenType.Comment))
+                    break;
+                while (reader.Is(SkipTypes))
+                    if (!reader.MoveNextIfIsOrEof(TokenType.NewLine, TokenType.Comment))
+                        break;
             }
         }
 
@@ -109,23 +120,23 @@ namespace AnalysisScript.Parser
                 _ => throw new InvalidDataException(),
             };
         }
-
+        private static TokenType[] ArgumentTypes = [TokenType.Number, TokenType.Integer, TokenType.String, TokenType.Identity];
         private static AsObject MoveNextAndReadArgument(IEnumerator<IToken> reader)
         {
-            reader.MoveNextAndRequire(TokenType.Number, TokenType.Integer, TokenType.String, TokenType.Identity);
+            reader.MoveNextAndRequire(ArgumentTypes);
             return reader.Current.Type switch
             {
                 TokenType.Number => new AsNumber((Token.Number)reader.Current),
                 TokenType.Integer => new AsInteger((Token.Integer)reader.Current),
                 TokenType.String => new AsString((Token.String)reader.Current),
                 TokenType.Identity => new AsIdentity((Token.Identity)reader.Current),
-                _ => throw new InvalidDataException(),
+                _ => throw new InvalidGrammarException(reader.Current, ArgumentTypes),
             };
         }
 
         private static IEnumerable<AsObject> ReadArguments(this IEnumerator<IToken> reader)
         {
-            while (reader.MoveNextAndIs(TokenType.Number, TokenType.Integer, TokenType.String, TokenType.Identity))
+            while (reader.MoveNextAndIs(ArgumentTypes))
             {
                 yield return ReadArgument(reader);
             }
@@ -150,7 +161,7 @@ namespace AnalysisScript.Parser
         private static AsComment ReadComment(IEnumerator<IToken> reader)
         {
             var comment = new AsComment((Token.Comment)reader.Current);
-            reader.MoveNextAndRequire(TokenType.NewLine);
+            reader.MoveNextIfIsOrEof(SkipTypes);
             return comment;
         }
 
@@ -159,9 +170,8 @@ namespace AnalysisScript.Parser
             var lex = reader.Current;
 
             var identity = reader.NextAndReadIdentity();
-            var arguments = reader.ReadArguments().ToList();
 
-            reader.MoveNextAndRequire(TokenType.NewLine);
+            var arguments = reader.ReadArguments().ToList();
 
             return new AsCall((Token.Call)lex, identity, arguments);
         }
@@ -169,10 +179,10 @@ namespace AnalysisScript.Parser
         private static IEnumerable<AsCommand> ReadCommands(IEnumerator<IToken> reader)
         {
             reader.MoveNextAndRequire(TokenType.Let, TokenType.Comment, TokenType.Call, TokenType.NewLine, TokenType.Return, TokenType.Param);
-            while (true)
+            while (reader.Current is not null)
             {
                 if (reader.Current.Type == TokenType.Let) yield return ReadLet(reader);
-                else if (reader.Current.Type == TokenType.Comment) yield return ReadComment(reader);
+                else if (reader.Current.Type == TokenType.Comment) { ReadComment(reader); }
                 else if (reader.Current.Type == TokenType.Call) yield return ReadCall(reader);
                 else if (reader.Current.Type == TokenType.NewLine) { if (!reader.MoveNext()) break; }
                 else if (reader.Current.Type == TokenType.Return) yield return reader.ReadReturn();

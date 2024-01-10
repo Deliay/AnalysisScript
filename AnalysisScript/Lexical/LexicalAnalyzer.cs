@@ -11,6 +11,7 @@
 
             bool HasMore() => pos < source.Length;
             char Peek() => current = source[pos++];
+            void Back() => pos -= 1;
             bool IsIdentityStart(char ch) => char.IsLetter(ch) || ch == '_';
             bool IsIdentity(char ch) => IsIdentityStart(ch) || char.IsNumber(ch);
             bool IsQuote(char ch) => ch == '"';
@@ -28,6 +29,8 @@
                 {
                     yield return new Token.Equal(pos, line);
                 }
+                else if (current == '\n') yield return new Token.NewLine(pos, line);
+                else if (char.IsWhiteSpace(current)) continue;
                 else if (char.IsNumber(current))
                 {
                     int integer = current - '0';
@@ -45,9 +48,15 @@
                             real += char.GetNumericValue(current) / d;
                             d *= 10;
                         }
+                        if (!char.IsNumber(current)) Back();
                         yield return new Token.Number(real, pos, line);
+                        
                     }
-                    yield return new Token.Integer(integer, pos, line);
+                    else
+                    {
+                        if (!char.IsNumber(current)) Back();
+                        yield return new Token.Integer(integer, pos, line);
+                    }
                 }
                 else if (IsIdentityStart(current))
                 {
@@ -90,8 +99,6 @@
                     yield return new Token.Comment(val, pos, line);
                     yield return new Token.NewLine(pos, ++line);
                 }
-                else if (current == '\n') yield return new Token.NewLine(pos, line);
-                else if (char.IsWhiteSpace(current)) continue;
                 else throw new InvalidTokenException(pos, current.ToString());
             } while (HasMore());
 
