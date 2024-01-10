@@ -58,7 +58,7 @@
                     }
                     if (val == "let") yield return new Token.Let(pos, line);
                     else if (val == "param") yield return new Token.Param(pos, line);
-                    else if (val == "ui") yield return new Token.Call(pos, line);
+                    else if (val == "call") yield return new Token.Call(pos, line);
                     else if (val == "return") yield return new Token.Return(pos, line);
                     else yield return new Token.Identity(val, pos, line);
                 }
