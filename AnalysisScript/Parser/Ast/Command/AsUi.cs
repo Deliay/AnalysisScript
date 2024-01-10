@@ -9,16 +9,19 @@ using System.Threading.Tasks;
 
 namespace AnalysisScript.Parser.Ast.Command
 {
-    public class AsUi(
+    public class AsCall(
         Token.Call lexical,
-        List<AsPipe> pipes)
-        : AsCommand<Token.Call>(lexical, CommandType.Ui)
+        AsIdentity methodName,
+        List<AsObject> args)
+        : AsCommand<Token.Call>(lexical, CommandType.Call)
     {
-        public List<AsPipe> Pipes => pipes;
+        public AsIdentity Method => methodName;
+
+        public List<AsObject> Args => args;
 
         public override string ToString()
         {
-            return $"ui\n{string.Join('\n', Pipes)}";
+            return $"call {Method} {string.Join(' ', Args)}";
         }
     }
 }

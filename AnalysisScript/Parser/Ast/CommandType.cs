@@ -8,7 +8,7 @@ namespace AnalysisScript.Parser.Ast
 {
     public enum CommandType
     {
-        Ui,
+        Call,
         Let,
         Comment,
         Param,

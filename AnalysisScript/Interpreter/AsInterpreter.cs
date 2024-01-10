@@ -62,7 +62,7 @@ public class AsInterpreter : IDisposable
         this.Variables.PutVariableContainer(let.Name, Variables.GetVariableContainer(runtimeValue));
     }
 
-    private ValueTask ExecuteUi(AsUi ui)
+    private ValueTask ExecuteUi(AsCall ui)
     {
         throw new NotImplementedException($"ui keyword not supported, pos {ui.LexicalToken.Pos}");
     }
@@ -137,7 +137,7 @@ public class AsInterpreter : IDisposable
         {
             await ExecuteLet(ctx, let);
         }
-        else if (cmd.Type == CommandType.Ui && cmd is AsUi ui)
+        else if (cmd.Type == CommandType.Call && cmd is AsCall ui)
         {
             await ExecuteUi(ui);
         }
