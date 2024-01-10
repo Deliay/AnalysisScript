@@ -67,11 +67,11 @@ namespace AnalysisScript.Interpreter.Variables.Method
             return method;
         }
 
-        public MethodCallExpression GetMethod(MethodCallExpression @this, string name, IEnumerable<MethodCallExpression> paramGetters)
+        public MethodCallExpression GetMethod(MethodCallExpression? @this, string name, IEnumerable<MethodCallExpression> paramGetters)
         {
-            var prefix = new string[2] {
-                name,
-                ExprTreeHelper.TypeParamString(@this.Method.ReturnType),
+            string[] prefix = (@this is null) switch {
+                true => [name],
+                _ => [name, ExprTreeHelper.TypeParamString(@this.Method.ReturnType)]
             };
             var paramStrings = prefix.Concat(paramGetters.Select(getter => ExprTreeHelper.TypeParamString(getter.Method.ReturnType)));
             var paramSign = ExprTreeHelper.JoinTypeParams(paramStrings);

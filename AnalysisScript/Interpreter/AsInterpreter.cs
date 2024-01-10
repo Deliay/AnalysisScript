@@ -62,9 +62,11 @@ public class AsInterpreter : IDisposable
         this.Variables.PutVariableContainer(let.Name, Variables.GetVariableContainer(runtimeValue));
     }
 
-    private ValueTask ExecuteUi(AsCall ui)
+    private async ValueTask ExecuteCall(AsExecutionContext ctx, AsCall call)
     {
-        throw new NotImplementedException($"ui keyword not supported, pos {ui.LexicalToken.Pos}");
+        var method = Variables.GetMethodCallLambda(call.Method.Name, call.Args, ctx).Compile();
+
+        await method();
     }
 
     private ValueTask ExecuteComment(AsComment comment)
@@ -124,7 +126,7 @@ public class AsInterpreter : IDisposable
 
     private async ValueTask RunCommand(AsExecutionContext ctx, AsCommand cmd)
     {
-        CurrentCommand = cmd?.ToString()!;
+        CurrentCommand = cmd.ToString()!;
         OnCommandUpdate?.Invoke(CurrentCommand);
 
         ctx.CurrentExecuteObject = cmd;
@@ -137,9 +139,9 @@ public class AsInterpreter : IDisposable
         {
             await ExecuteLet(ctx, let);
         }
-        else if (cmd.Type == CommandType.Call && cmd is AsCall ui)
+        else if (cmd.Type == CommandType.Call && cmd is AsCall call)
         {
-            await ExecuteUi(ui);
+            await ExecuteCall(ctx, call);
         }
         else if (cmd.Type == CommandType.Return && cmd is AsReturn @return)
         {

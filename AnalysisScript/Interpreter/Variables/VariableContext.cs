@@ -100,10 +100,10 @@ namespace AnalysisScript.Interpreter.Variables
             throw new UnknownValueObjectException(@object);
         }
 
-        private IEnumerable<MethodCallExpression> args(IEnumerable<AsObject> arguments, MethodCallExpression @this, AsExecutionContext ctx)
+        private IEnumerable<MethodCallExpression> args(IEnumerable<AsObject> arguments, MethodCallExpression? @this, AsExecutionContext ctx)
         {
             yield return ExprTreeHelper.GetConstantValueLambda(ctx);
-            yield return @this;
+            if (@this is not null) yield return @this;
             foreach (var item in arguments)
             {
                 var expr = LambdaValueOf(item);
@@ -111,7 +111,7 @@ namespace AnalysisScript.Interpreter.Variables
             }
         }
 
-        public Expression<Func<ValueTask<IContainer>>> GetMethodCallLambda(MethodCallExpression @this, string name, List<AsObject> methodParams, AsExecutionContext ctx)
+        public Expression<Func<ValueTask<IContainer>>> GetMethodCallLambda(MethodCallExpression? @this, string name, List<AsObject> methodParams, AsExecutionContext ctx)
         {
             var exprValues = args(methodParams, @this, ctx);
             var method = Methods.GetMethod(@this, name, exprValues);
@@ -121,6 +121,11 @@ namespace AnalysisScript.Interpreter.Variables
             method = Expression.Call(retValueType, method);
 
             return Expression.Lambda<Func<ValueTask<IContainer>>>(method);
+        }
+
+        public Expression<Func<ValueTask<IContainer>>> GetMethodCallLambda(string name, List<AsObject> methodParams, AsExecutionContext ctx)
+        {
+            return GetMethodCallLambda(null!, name, methodParams, ctx);
         }
 
         public string Interpolation(AsString str)
