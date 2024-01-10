@@ -5,7 +5,7 @@ using AnalysisScript.Lexical;
 public class LexicalAnalysisTest
 {
     [Fact]
-    public void WillSkipLf()
+    public void DontSkipLf()
     { 
         var tokens = LexicalAnalyzer.Analyze("\n|\n");
         Assert.All(tokens, (token, i) =>
