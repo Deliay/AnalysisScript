@@ -15,13 +15,17 @@ public class AsInterpreter : IDisposable
     public IContainer? Return { get; private set; }
     public string LastComment { get; private set; } = "";
     public string CurrentCommand { get; private set; } = "";
-    public AsAnalysis Tree { get; }
+    public AsAnalysis? Tree { get; set; } = null;
 
     public event Action<string>? OnCommentUpdate;
 
     public event Action<string>? OnCommandUpdate;
 
     public event Action<string>? OnLogging;
+
+    public AsInterpreter()
+    {
+    }
 
     public AsInterpreter(AsAnalysis tree)
     {
@@ -67,13 +71,6 @@ public class AsInterpreter : IDisposable
         var method = Variables.GetMethodCallLambda(call.Method.Name, call.Args, ctx).Compile();
 
         await method();
-    }
-
-    private ValueTask ExecuteComment(AsComment comment)
-    {
-        LastComment = comment.Content;
-        OnCommentUpdate?.Invoke(LastComment);
-        return ValueTask.CompletedTask;
     }
 
     private ValueTask ExecuteReturn(AsReturn @return)
@@ -131,11 +128,7 @@ public class AsInterpreter : IDisposable
 
         ctx.CurrentExecuteObject = cmd;
 
-        if (cmd.Type == CommandType.Comment && cmd is AsComment comment)
-        {
-            await ExecuteComment(comment);
-        }
-        else if (cmd.Type == CommandType.Let && cmd is AsLet let)
+        if (cmd.Type == CommandType.Let && cmd is AsLet let)
         {
             await ExecuteLet(ctx, let);
         }
