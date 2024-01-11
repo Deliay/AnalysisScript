@@ -8,7 +8,7 @@ using System.Linq.Expressions;
 
 namespace AnalysisScript.Interpreter.Variables
 {
-    public class VariableContext
+    public class VariableContext(MethodContext methods)
     {
         public IEnumerable<KeyValuePair<AsIdentity, IContainer>> AllVariables => variables;
         private readonly VariableMap variables = [];
@@ -19,12 +19,9 @@ namespace AnalysisScript.Interpreter.Variables
             variables.Add(id, value);
             return id;
         }
-        public MethodContext Methods { get; }
+        public MethodContext Methods { get; } = methods;
 
-        public VariableContext()
-        {
-            Methods = new(this);
-        }
+        public VariableContext() : this(new()) { }
 
         public void PutInitVariable<T>(AsIdentity id, T value)
         {

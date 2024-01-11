@@ -9,13 +9,13 @@ using System.Reflection;
 
 namespace AnalysisScript.Interpreter;
 
-public class AsInterpreter : IDisposable
+public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : IDisposable
 {
-    public VariableContext Variables { get; } = new();
+    public VariableContext Variables { get; } = variableContext;
     public IContainer? Return { get; private set; }
     public string LastComment { get; private set; } = "";
     public string CurrentCommand { get; private set; } = "";
-    public AsAnalysis? Tree { get; set; } = null;
+    public AsAnalysis? Tree { get; set; } = tree;
 
     public event Action<string>? OnCommentUpdate;
 
@@ -23,13 +23,16 @@ public class AsInterpreter : IDisposable
 
     public event Action<string>? OnLogging;
 
-    public AsInterpreter()
+    public AsInterpreter() : this(null!, new())
     {
     }
 
-    public AsInterpreter(AsAnalysis tree)
+    public AsInterpreter(VariableContext variableContext) : this(null!, variableContext)
     {
-        Tree = tree;
+    }
+
+    public AsInterpreter(AsAnalysis tree) : this(tree, new())
+    {
     }
 
     private void Logging(string message)
@@ -87,12 +90,14 @@ public class AsInterpreter : IDisposable
         return ValueTask.CompletedTask;
     }
 
+    [Obsolete("Use methods in 'MethodContext' for instead (this.Variables.Methods)")]
     public AsInterpreter RegisterStaticFunction(string name, MethodInfo method)
     {
         Variables.Methods.RegisterStaticFunction(name, method);
         return this;
     }
     
+    [Obsolete("Use methods in 'MethodContext' for instead (this.Variables.Methods)")]
     public AsInterpreter RegisterInstanceFunction(string name, Delegate @delegate)
     {
         Variables.Methods.RegisterInstanceFunction(name, @delegate);
