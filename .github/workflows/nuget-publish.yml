@@ -20,8 +20,10 @@ jobs:
     - name: Build
       run: dotnet pack
     - name: publish-to-nuget
+      continue-on-error: true
       run: dotnet nuget push **/*-beta.*.nupkg --api-key=${{secrets.NUGET_KEY}} --skip-duplicate --source=https://api.nuget.org/v3/index.json
     - name: publish-to-github
+      continue-on-error: true
       run: dotnet nuget push **/*-beta.*.nupkg --api-key=${{secrets.GH_PACKAGE_KEY}} --skip-duplicate --source=https://nuget.pkg.github.com/Deliay/index.json
       
         
