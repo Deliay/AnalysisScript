@@ -1,19 +1,17 @@
-﻿namespace AnalysisScript.Lexical
+﻿namespace AnalysisScript.Lexical;
+
+public enum TokenType
 {
-    public enum TokenType
-    {
-        Equal = '=',
-        Pipe = '|',
-        Comment = '#',
-        NewLine = '\n',
-        END = '\xFF',
-        Param,
-        Let,
-        Call,
-        Identity,
-        String,
-        Number,
-        Integer,
-        Return,
-    }
+    Equal = '=',
+    Pipe = '|',
+    Comment = '#',
+    NewLine = '\n',
+    Param,
+    Let,
+    Call,
+    Identity,
+    String,
+    Number,
+    Integer,
+    Return,
 }

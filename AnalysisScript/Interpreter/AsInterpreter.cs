@@ -1,10 +1,8 @@
 using AnalysisScript.Interpreter.Variables;
-using AnalysisScript.Library;
 using AnalysisScript.Parser.Ast;
 using AnalysisScript.Parser.Ast.Basic;
 using AnalysisScript.Parser.Ast.Command;
 using AnalysisScript.Parser.Ast.Operator;
-using System.Linq.Expressions;
 using System.Reflection;
 
 namespace AnalysisScript.Interpreter;
@@ -13,17 +11,20 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
 {
     public VariableContext Variables { get; } = variableContext;
     public IContainer? Return { get; private set; }
+    
+    [Obsolete("Property removed since 1.0.3")]
     public string LastComment { get; private set; } = "";
     public string CurrentCommand { get; private set; } = "";
     public AsAnalysis? Tree { get; set; } = tree;
 
+    [Obsolete("Event removed since 1.0.3")]
     public event Action<string>? OnCommentUpdate;
 
     public event Action<string>? OnCommandUpdate;
 
     public event Action<string>? OnLogging;
 
-    public AsInterpreter() : this(null!, new())
+    public AsInterpreter() : this(null!, new VariableContext())
     {
     }
 
@@ -31,7 +32,7 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
     {
     }
 
-    public AsInterpreter(AsAnalysis tree) : this(tree, new())
+    public AsInterpreter(AsAnalysis tree) : this(tree, new VariableContext())
     {
     }
 
@@ -118,12 +119,7 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
     public async ValueTask<T?> RunAndReturn<T>(AsExecutionContext ctx)
     {
         await Run(ctx);
-        if (Return is not null)
-        {
-            return Return.ValueCastTo<T>();
-        }
-
-        return default;
+        return Return is not null ? Return.ValueCastTo<T>() : default;
     }
 
     private async ValueTask RunCommand(AsExecutionContext ctx, AsCommand cmd)
@@ -133,23 +129,25 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
 
         ctx.CurrentExecuteObject = cmd;
 
-        if (cmd.Type == CommandType.Let && cmd is AsLet let)
+        switch (cmd.Type)
         {
-            await ExecuteLet(ctx, let);
+            case CommandType.Let when cmd is AsLet let:
+                await ExecuteLet(ctx, let);
+                break;
+            case CommandType.Call when cmd is AsCall call:
+                await ExecuteCall(ctx, call);
+                break;
+            case CommandType.Return when cmd is AsReturn @return:
+                await ExecuteReturn(@return);
+                break;
+            case CommandType.Param when cmd is AsParam param:
+                await ExecuteParam(param);
+                break;
+            case CommandType.Comment:
+                break;
+            default:
+                throw new UnknownCommandException(cmd);
         }
-        else if (cmd.Type == CommandType.Call && cmd is AsCall call)
-        {
-            await ExecuteCall(ctx, call);
-        }
-        else if (cmd.Type == CommandType.Return && cmd is AsReturn @return)
-        {
-            await ExecuteReturn(@return);
-        }
-        else if (cmd.Type == CommandType.Param && cmd is AsParam param)
-        {
-            await ExecuteParam(param);
-        }
-        else throw new UnknownCommandException(cmd);
     }
 
 

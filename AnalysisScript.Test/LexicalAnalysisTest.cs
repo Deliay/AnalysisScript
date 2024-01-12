@@ -166,11 +166,12 @@ public class LexicalAnalysisTest
     [Fact]
     public void CanResolveComment()
     {
-        string comment = " 114514";
+        var comment = " 114514";
         var tokens = LexicalAnalyzer.Analyze($"#{comment}");
-        Assert.Contains(tokens, token => token.Type == TokenType.Comment);
-        Assert.Equal(comment, tokens.Cast<Token.Comment>().First().Word);
-        Assert.Equal(3, tokens.Count());
+        var resolvedTokenList = tokens.ToList();
+        Assert.Contains(resolvedTokenList, token => token.Type == TokenType.Comment);
+        Assert.Equal(comment, resolvedTokenList.Cast<Token.Comment>().First().Word);
+        Assert.Equal(3, resolvedTokenList.Count);
     }
     [Fact]
     public void CanSkipSpace()
