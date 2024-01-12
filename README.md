@@ -4,33 +4,43 @@ A super mini script for log analysis
 ## Examples
 
 ### Basic usage (with BFL)
-```c#
+```csharp
 using AnalysisScript.Library;
 
-var lexicalTokens = LexicalAnalyzer.Analyze("...source...");
-var ast = ScriptParser.Parse(lexicalTokens);
-AsInterpreter interpreter = new AsInterpreter(ast)
-.RegisterBasicFunctionsV2()
-.AddVariable("a", new List<string>() { "ab", "ac", "bc" })
-.AddVariable("b", "result is: ");
+// initialize variables
+var variables = new VariableContext()
+    .AddInitializeVariable("a", 1)
+    .AddInitialzieVariable("b", new List<int>() { 2, 3, 4 });
 
-var result = await interpreter.RunAndReturn<string>();
+// register custom methods
+var incrSingle = (int x) => ValueTask.FromResult(p + 1);
+var incrSequence = (IEnumerable<int> xs)
+    => ValueTask.CompleteTask(xs.Select(x => x + 1));
 
-Console.WriteLine(result);
-// Output: result is: ab|ac
-```
+variables.Methods.RegisterInstanceFunction("inc", incrSingle);
+variables.Methods.RegisterInstanceFunction("inc", incrSequence);
 
-```
+// run code and get return value
+var interpreter = AsInterpreter.Of(variables,
+"""
 param a
 param b
 
-let c = a
-| filter_regex "a."
-| join "|"
+let first = c
+| inc
 
-let d = "${b}${a}"
+let tail = d
+| inc
+| join "," 
 
-return d
+let res = "${first},${tail}"
+
+return res
+""");
+var result = await interpreter.RunAndReturn<string>();
+
+// Output: 2,3,4,5
+Console.WriteLine(result);
 ```
 
 ### All grammar example
@@ -39,22 +49,14 @@ return d
 param a
 
 let b = arg1
-| ... call functions ...
 | fn arg2 arg3
 | fn2 arg2
-| fn...
+| fn3
 
-call fn3 arg1 arg2 arg3
-
-# declare variable set by 'fn3'
-param c
+call fn4 arg1 arg2 arg3
 
 let d = "string interpolation ${c}"
 let e = "string ${c} interpolation"
-let f = "${c} string interpolation"
-
-# List<String> {d, e, f}
-let g = [d, e, f]
 
 return d
 ```
