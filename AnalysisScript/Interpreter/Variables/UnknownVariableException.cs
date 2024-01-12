@@ -8,6 +8,5 @@ public class UnknownVariableException(IWordToken identity)
 {
     public UnknownVariableException(AsIdentity id) : this(id.LexicalToken)
     {
-
     }
 }

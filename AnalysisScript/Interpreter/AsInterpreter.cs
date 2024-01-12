@@ -1,31 +1,41 @@
 using AnalysisScript.Interpreter.Variables;
-using AnalysisScript.Library;
 using AnalysisScript.Parser.Ast;
 using AnalysisScript.Parser.Ast.Basic;
 using AnalysisScript.Parser.Ast.Command;
 using AnalysisScript.Parser.Ast.Operator;
-using System.Linq.Expressions;
 using System.Reflection;
+using AnalysisScript.Lexical;
+using AnalysisScript.Parser;
 
 namespace AnalysisScript.Interpreter;
 
-public class AsInterpreter : IDisposable
+public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : IDisposable
 {
-    public VariableContext Variables { get; } = new();
+    public VariableContext Variables { get; } = variableContext;
     public IContainer? Return { get; private set; }
+    
+    [Obsolete("Property removed since 1.0.3")]
     public string LastComment { get; private set; } = "";
     public string CurrentCommand { get; private set; } = "";
-    public AsAnalysis Tree { get; }
+    public AsAnalysis? Tree { get; set; } = tree;
 
+    [Obsolete("Event removed since 1.0.3")]
     public event Action<string>? OnCommentUpdate;
 
     public event Action<string>? OnCommandUpdate;
 
     public event Action<string>? OnLogging;
 
-    public AsInterpreter(AsAnalysis tree)
+    public AsInterpreter() : this(null!, new VariableContext())
     {
-        Tree = tree;
+    }
+
+    public AsInterpreter(VariableContext variableContext) : this(null!, variableContext)
+    {
+    }
+
+    public AsInterpreter(AsAnalysis tree) : this(tree, new VariableContext())
+    {
     }
 
     private void Logging(string message)
@@ -62,16 +72,11 @@ public class AsInterpreter : IDisposable
         this.Variables.PutVariableContainer(let.Name, Variables.GetVariableContainer(runtimeValue));
     }
 
-    private ValueTask ExecuteUi(AsUi ui)
+    private async ValueTask ExecuteCall(AsExecutionContext ctx, AsCall call)
     {
-        throw new NotImplementedException($"ui keyword not supported, pos {ui.LexicalToken.Pos}");
-    }
+        var method = Variables.GetMethodCallLambda(call.Method.Name, call.Args, ctx).Compile();
 
-    private ValueTask ExecuteComment(AsComment comment)
-    {
-        LastComment = comment.Content;
-        OnCommentUpdate?.Invoke(LastComment);
-        return ValueTask.CompletedTask;
+        await method();
     }
 
     private ValueTask ExecuteReturn(AsReturn @return)
@@ -88,12 +93,14 @@ public class AsInterpreter : IDisposable
         return ValueTask.CompletedTask;
     }
 
+    [Obsolete("Use methods in 'MethodContext' for instead (this.Variables.Methods)")]
     public AsInterpreter RegisterStaticFunction(string name, MethodInfo method)
     {
         Variables.Methods.RegisterStaticFunction(name, method);
         return this;
     }
     
+    [Obsolete("Use methods in 'MethodContext' for instead (this.Variables.Methods)")]
     public AsInterpreter RegisterInstanceFunction(string name, Delegate @delegate)
     {
         Variables.Methods.RegisterInstanceFunction(name, @delegate);
@@ -114,42 +121,35 @@ public class AsInterpreter : IDisposable
     public async ValueTask<T?> RunAndReturn<T>(AsExecutionContext ctx)
     {
         await Run(ctx);
-        if (Return is not null)
-        {
-            return Return.ValueCastTo<T>();
-        }
-
-        return default;
+        return Return is not null ? Return.ValueCastTo<T>() : default;
     }
 
     private async ValueTask RunCommand(AsExecutionContext ctx, AsCommand cmd)
     {
-        CurrentCommand = cmd?.ToString()!;
+        CurrentCommand = cmd.ToString()!;
         OnCommandUpdate?.Invoke(CurrentCommand);
 
         ctx.CurrentExecuteObject = cmd;
 
-        if (cmd.Type == CommandType.Comment && cmd is AsComment comment)
+        switch (cmd.Type)
         {
-            await ExecuteComment(comment);
+            case CommandType.Let when cmd is AsLet let:
+                await ExecuteLet(ctx, let);
+                break;
+            case CommandType.Call when cmd is AsCall call:
+                await ExecuteCall(ctx, call);
+                break;
+            case CommandType.Return when cmd is AsReturn @return:
+                await ExecuteReturn(@return);
+                break;
+            case CommandType.Param when cmd is AsParam param:
+                await ExecuteParam(param);
+                break;
+            case CommandType.Comment:
+                break;
+            default:
+                throw new UnknownCommandException(cmd);
         }
-        else if (cmd.Type == CommandType.Let && cmd is AsLet let)
-        {
-            await ExecuteLet(ctx, let);
-        }
-        else if (cmd.Type == CommandType.Ui && cmd is AsUi ui)
-        {
-            await ExecuteUi(ui);
-        }
-        else if (cmd.Type == CommandType.Return && cmd is AsReturn @return)
-        {
-            await ExecuteReturn(@return);
-        }
-        else if (cmd.Type == CommandType.Param && cmd is AsParam param)
-        {
-            await ExecuteParam(param);
-        }
-        else throw new UnknownCommandException(cmd);
     }
 
 
@@ -176,5 +176,20 @@ public class AsInterpreter : IDisposable
         OnCommandUpdate = null;
         OnCommentUpdate = null;
         OnLogging = null;
+    }
+
+    public static AsInterpreter Of(VariableContext variableContext, AsAnalysis tree)
+    {
+        return new AsInterpreter(tree, variableContext);
+    }
+
+    public static AsInterpreter Of(VariableContext variableContext, string code)
+    {
+        return Of(variableContext, ScriptParser.Parse(LexicalAnalyzer.Analyze(code))!);
+    }
+
+    public static AsInterpreter Of(string code)
+    {
+        return Of(new VariableContext(), code);
     }
 }

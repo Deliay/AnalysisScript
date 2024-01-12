@@ -7,41 +7,41 @@ namespace AnalysisScript.Interpreter.Variables;
 
 public class VariableMap : IEnumerable<KeyValuePair<AsIdentity, IContainer>>
 {
-    private readonly Dictionary<AsIdentity, IContainer> VarMap = [];
-    private readonly Dictionary<string, AsIdentity> NameMap = [];
+    private readonly Dictionary<AsIdentity, IContainer> _varMap = [];
+    private readonly Dictionary<string, AsIdentity> _nameMap = [];
 
     public void Add(AsIdentity id, IContainer container)
     {
-        VarMap.Add(id, container);
-        NameMap.Add(id.Name, id);
+        _varMap.Add(id, container);
+        _nameMap.Add(id.Name, id);
     }
 
     public void Update(AsIdentity newId)
     {
-        var val = VarMap[newId];
-        VarMap.Remove(newId);
-        VarMap.Add(newId, val);
+        var val = _varMap[newId];
+        _varMap.Remove(newId);
+        _varMap.Add(newId, val);
     }
 
     public bool ContainsKey(AsIdentity id)
     {
-        return VarMap.ContainsKey(id);
+        return _varMap.ContainsKey(id);
     }
 
-    public IEnumerator<KeyValuePair<AsIdentity, IContainer>> GetEnumerator() => VarMap.GetEnumerator();
-    IEnumerator IEnumerable.GetEnumerator() => VarMap.GetEnumerator();
+    public IEnumerator<KeyValuePair<AsIdentity, IContainer>> GetEnumerator() => _varMap.GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => _varMap.GetEnumerator();
 
     public bool TryGetValue(AsIdentity id, [NotNullWhen(true)] out IContainer container)
     {
-        return VarMap.TryGetValue(id, out container!);
+        return _varMap.TryGetValue(id, out container!);
     }
 
     public bool TryGetValue(string name, [NotNullWhen(true)] out IContainer container)
     {
         container = null!;
 
-        return NameMap.TryGetValue(name, out var id)
-            && VarMap.TryGetValue(id, out container!);
+        return _nameMap.TryGetValue(name, out var id)
+            && _varMap.TryGetValue(id, out container!);
     }
 
 }

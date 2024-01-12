@@ -1,85 +1,162 @@
-﻿using AnalysisScript.Library;
-using AnalysisScript.Parser.Ast.Basic;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 using System.Reflection;
-using System.Reflection.Metadata;
-using System.Text;
-using System.Threading.Tasks;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
-namespace AnalysisScript.Interpreter.Variables.Method
+namespace AnalysisScript.Interpreter.Variables.Method;
+
+public class MethodContext
 {
-    public class MethodContext(VariableContext variableContext)
-    {
-        private readonly Dictionary<string, List<(MethodInfo, ConstantExpression?)>> rawMethod = [];
+    private readonly Dictionary<string, List<(MethodInfo, ConstantExpression?)>> _rawMethod = [];
     
-        private readonly static Dictionary<string, MethodCallExpression> methods = [];
+    private readonly Dictionary<string, MethodCallExpression> _methods = [];
 
-        // public void RegisterFunction(string name, MethodCallExpression function)
-        // {
-        //     rawMethod.Add(name, function);
-        // }
+    public IReadOnlyDictionary<string, IEnumerable<(MethodInfo, ConstantExpression?)>> AllRawMethod => _rawMethod
+        .Select(f => (f.Key, f.Value.AsEnumerable()))
+        .ToDictionary();
 
-        public void RegisterStaticFunction(string name, MethodInfo function)
+    public IReadOnlyDictionary<string, MethodCallExpression> AllBuiltMethod => _methods;
+
+    private static MethodInfo GetMethodDefinition(MethodInfo method) => method.IsGenericMethod switch
+    {
+        true => method.GetGenericMethodDefinition(),
+        _ => method,
+    };
+
+    public static IEnumerable<(string name, MethodInfo method)> ScanClassForStaticMethod<T>() where T : class
+    {
+        return ScanClassForStaticMethod(typeof(T));
+    }
+    public static IEnumerable<(string name, MethodInfo method)> ScanClassForStaticMethod(Type type)
+    {
+        if (type.IsGenericType) throw new InvalidOperationException();
+        return type.GetRuntimeMethods()
+            .Where(method => (method.Attributes & MethodAttributes.Static) > 0)
+            .SelectMany(GetMethodInfoForRegistration);
+    }
+    public static IEnumerable<(string name, (object @this, MethodInfo method) callInfo)> ScanInstanceForInstanceMethod(object instance)
+    {
+        var type = instance.GetType();
+        return type.GetRuntimeMethods()
+            .Where(method => (method.Attributes & MethodAttributes.Static) == 0)
+            // don't resolve generic method if who want register
+            .Select(method => (method, attributes: method.GetCustomAttributes<AsMethodAttribute>()))
+            .Where(info => info.attributes.Any())
+            .SelectMany(info => info.attributes.Select(attr => (attr.Name, (instance, info.method))));
+    }
+
+    public static IEnumerable<(string name, MethodInfo method)> GetMethodInfoForRegistration(Delegate @delegate)
+    {
+        return GetMethodInfoForRegistration(@delegate.Method);
+    }
+
+    public static IEnumerable<(string name, MethodInfo method)> GetMethodInfoForRegistration(MethodInfo method)
+    {
+        return GetMethodDefinition(method)
+            .GetCustomAttributes<AsMethodAttribute>()
+            .Select(attr => (attr.Name, method))
+            .ToArray();
+    }
+
+    public MethodContext ScanAndRegisterStaticFunction(Type type)
+    {
+        foreach (var (name, method) in ScanClassForStaticMethod(type))
         {
-            if (!function.IsStatic)
-            {
-                throw new NullReferenceException("Can't register instance method to static registry");
-            }
-            if (!rawMethod.TryGetValue(name, out var methodList))
-            {
-                rawMethod.Add(name, [(function, null)]);
-            }
-            else methodList.Add((function, null));
+            RegisterStaticFunction(name, method);
         }
-
-        public void RegisterInstanceFunction(string name, Delegate @delegate)
+        return this;
+    }
+        
+    public MethodContext ScanAndRegisterInstanceFunction(object @this)
+    {
+        foreach (var (name, callInfo) in ScanInstanceForInstanceMethod(@this))
         {
-            if (@delegate.Method.IsStatic && @delegate.Target is null)
-            {
-                throw new NullReferenceException("Instance is null when register instance function");
-            }
-            var constant = Expression.Constant(@delegate.Target);
-            if (!rawMethod.TryGetValue(name, out var methodList))
-            {
-                rawMethod.Add(name, [(@delegate.Method, constant)]);
-            }
-            else methodList.Add((@delegate.Method, constant));
+            RegisterInstanceFunction(name, callInfo);
         }
+        return this;
+    }
 
-        private readonly static string ContextParamString = ExprTreeHelper.TypeParamString(typeof(AsExecutionContext));
-
-        private MethodCallExpression BuildMethod(string name, string singedName, IEnumerable<MethodCallExpression> parameters)
+    public MethodContext RegisterStaticFunction(string name, MethodInfo function)
+    {
+        if (!function.IsStatic)
         {
-            if (!this.rawMethod.TryGetValue(name, out var rawMethods))
-                throw new UnknownMethodException(name, singedName);
-
-            var signature = string.Join(',', name, ExprTreeHelper.GetSignatureOf(parameters));
-
-            if (!methods.TryGetValue(signature, out var method))
-            {
-                var (expr, sign) = ExprTreeHelper.BuildMethod(rawMethods, parameters);
-                methods.Add(string.Join(',', name, sign), method = expr);
-            }
-            return method;
+            throw new NullReferenceException("Can't register instance method to static registry");
         }
-
-        public MethodCallExpression GetMethod(MethodCallExpression @this, string name, IEnumerable<MethodCallExpression> paramGetters)
+        if (function.ReturnType == typeof(void))
         {
-            var prefix = new string[2] {
-                name,
-                ExprTreeHelper.TypeParamString(@this.Method.ReturnType),
-            };
-            var paramStrings = prefix.Concat(paramGetters.Select(getter => ExprTreeHelper.TypeParamString(getter.Method.ReturnType)));
-            var paramSign = ExprTreeHelper.JoinTypeParams(paramStrings);
-
-            if (!methods.TryGetValue(paramSign, out var method))
-                method = BuildMethod(name, paramSign, paramGetters);
-
-            return method;
+            throw new InvalidOperationException("Can't register void method");
         }
+        if (!_rawMethod.TryGetValue(name, out var methodList))
+        {
+            _rawMethod.Add(name, [(function, null)]);
+        }
+        else methodList.Add((function, null));
+
+        return this;
+    }
+
+    public MethodContext RegisterInstanceFunction(string name, Delegate @delegate)
+    {
+        RegisterInstanceFunction(name, (@delegate.Target, @delegate.Method));
+
+        return this;
+    }
+
+    public MethodContext RegisterInstanceFunction(string name, (object? @this, MethodInfo method) registration)
+    {
+        if (registration.method.IsStatic)
+        {
+            throw new InvalidDataException("Don't register static method to instance registry");
+        }
+        if (registration.@this is null)
+        {
+            throw new NullReferenceException("Instance is null when register instance function");
+        }
+        if (_rawMethod.Any(k => k.Key == name && k.Value.Any(m => m.Item1 == registration.method)))
+        {
+            throw new InvalidOperationException("Duplicated instance registered to this context");
+        }
+        if (registration.method.ReturnType == typeof(void))
+        {
+            throw new InvalidOperationException("Can't register void method");
+        }
+        var constant = Expression.Constant(registration.@this);
+        if (!_rawMethod.TryGetValue(name, out var methodList))
+        {
+            _rawMethod.Add(name, [(registration.method, constant)]);
+        }
+        else methodList.Add((registration.method, constant));
+
+        return this;
+    }
+
+    private MethodCallExpression BuildMethod(string name, string singedName, IEnumerable<MethodCallExpression> parameters)
+    {
+        if (!this._rawMethod.TryGetValue(name, out var rawMethods))
+            throw new UnknownMethodException(name, singedName);
+
+        var parameterList = parameters.ToList();
+        var signature = string.Join(',', name, ExprTreeHelper.GetSignatureOf(parameterList));
+
+        if (!_methods.TryGetValue(signature, out var method))
+        {
+            var (expr, sign) = ExprTreeHelper.BuildMethod(rawMethods, parameterList);
+            _methods.Add(string.Join(',', name, sign), method = expr);
+        }
+        return method;
+    }
+
+    public MethodCallExpression GetMethod(MethodCallExpression? @this, string name, IEnumerable<MethodCallExpression> paramGetters)
+    {
+        string[] prefix = (@this is null) switch {
+            true => [name],
+            _ => [name, ExprTreeHelper.TypeParamString(@this.Method.ReturnType)]
+        };
+        var parameterList = paramGetters.ToList();
+        var paramStrings = prefix.Concat(parameterList.Select(getter => ExprTreeHelper.TypeParamString(getter.Method.ReturnType)));
+        var paramSign = ExprTreeHelper.JoinTypeParams(paramStrings);
+
+        if (!_methods.TryGetValue(paramSign, out var method))
+            method = BuildMethod(name, paramSign, parameterList);
+
+        return method;
     }
 }
