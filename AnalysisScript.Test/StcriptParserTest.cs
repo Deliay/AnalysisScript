@@ -8,8 +8,6 @@ using AnalysisScript.Test.Parser;
 
 public class StcriptParserTest
 {
-    
-
     [Fact]
     public void CanParseLetKeyword()
     {
@@ -24,6 +22,7 @@ let {varName} = ""{varValue}""
         var arg = Assert.IsType<AsString>(let.Arg);
         Assert.Equal(varValue, arg.RawContent);
     }
+
     [Fact]
     public void CanParseLetKeywordWithNumberArg()
     {
@@ -38,6 +37,7 @@ let {varName} = {varValue}
         var arg = Assert.IsType<AsNumber>(let.Arg);
         Assert.Equal(varValue, arg.Real);
     }
+
     [Fact]
     public void CanParseLetKeywordWithIntegerArg()
     {
@@ -52,6 +52,7 @@ let {varName} = {varValue}
         var arg = Assert.IsType<AsInteger>(let.Arg);
         Assert.Equal(varValue, arg.Value);
     }
+
     [Fact]
     public void CanParseLetKeywordWithIdentityArg()
     {
@@ -66,6 +67,7 @@ let {varName} = {varValue}
         var arg = Assert.IsType<AsIdentity>(let.Arg);
         Assert.Equal(varValue, arg.Name);
     }
+
     [Fact]
     public void ThrowWhenLetArgContinueWithOtherElement()
     {
@@ -73,6 +75,7 @@ let {varName} = {varValue}
 let a = let
 ")));
     }
+
     [Fact]
     public void CanParseLetKeywordWithPipe()
     {
@@ -93,7 +96,6 @@ let {varName} = {varValue}
 
     private void AssertLet()
     {
-
     }
 
     [Fact]
@@ -113,6 +115,7 @@ let {varName} = {varValue}
         Assert.Equal(varValue, arg.Real);
         Assert.Equal(2, let.Pipes.Count);
     }
+
     [Fact]
     public void CanParseManyLetKeywordWithPipes()
     {
@@ -131,9 +134,9 @@ let {varName} = {varValue}
 | b
 | c
 "));
-        
+
         Assert.Equal(3, ast.Commands.Count);
-        
+
         ast.Commands[0].IsLet(
             id: (id) => Assert.Equal(varName, id.Name),
             arg: (arg) => arg.IsNumber(varValue),
@@ -150,6 +153,7 @@ let {varName} = {varValue}
             pipes: (pipes) => Assert.Equal(2, pipes.Count)
         );
     }
+
     [Fact]
     public void CanParseManyLetKeywordWithPipesAndManyArgs()
     {
@@ -168,13 +172,14 @@ let {varName} = {varValue}
 | b 1.1 ""1"" 1
 | c e ""1"" 1.1 f
 "));
-        
+
         Assert.Equal(3, ast.Commands.Count);
-        
+
         ast.Commands[0].IsLet(
             id: (id) => Assert.Equal(varName, id.Name),
             arg: (arg) => arg.IsNumber(varValue),
-            pipes: (pipes) => {
+            pipes: (pipes) =>
+            {
                 Assert.Equal(2, pipes.Count);
                 pipes[0].FunctionName.IsIdentity("b");
                 pipes[0].Arguments[0].IsIdentity("e");
@@ -187,7 +192,8 @@ let {varName} = {varValue}
         ast.Commands[1].IsLet(
             id: (id) => Assert.Equal(varName, id.Name),
             arg: (arg) => arg.IsNumber(varValue),
-            pipes: (pipes) => {
+            pipes: (pipes) =>
+            {
                 Assert.Equal(3, pipes.Count);
                 pipes[0].FunctionName.IsIdentity("b");
                 pipes[0].Arguments[0].IsIdentity("e");
@@ -204,7 +210,8 @@ let {varName} = {varValue}
         ast.Commands[2].IsLet(
             id: (id) => Assert.Equal(varName, id.Name),
             arg: (arg) => arg.IsNumber(varValue),
-            pipes: (pipes) => {
+            pipes: (pipes) =>
+            {
                 Assert.Equal(2, pipes.Count);
                 pipes[0].FunctionName.IsIdentity("b");
                 pipes[0].Arguments[0].IsNumber(1.1);
@@ -218,6 +225,7 @@ let {varName} = {varValue}
             }
         );
     }
+
     [Fact]
     public void CanParseManyLetKeywordWithPipesAndComments()
     {
@@ -244,9 +252,9 @@ let {varName} = {varValue}
 | b
 | c
 "));
-        
+
         Assert.Equal(3, ast.Commands.Count);
-        
+
         ast.Commands[0].IsLet(
             id: (id) => Assert.Equal(varName, id.Name),
             arg: (arg) => arg.IsNumber(varValue),
@@ -263,6 +271,7 @@ let {varName} = {varValue}
             pipes: (pipes) => Assert.Equal(2, pipes.Count)
         );
     }
+
     [Fact]
     public void CanParseCallKeywordWithArg()
     {
@@ -277,6 +286,7 @@ call {varName} {varValue}
             args => Assert.Single(args).IsNumber(varValue)
         );
     }
+
     [Fact]
     public void CanParseCallKeywordWithManyArg()
     {
@@ -288,7 +298,8 @@ call {varName} {varValue} a b c 1.1 ""1""
         Assert.Single(ast.Commands);
         ast.Commands[0].IsCall(
             id => id.IsIdentity(varName),
-            args => {
+            args =>
+            {
                 Assert.Equal(6, args.Count);
                 args[0].IsNumber(varValue);
                 args[1].IsIdentity("a");
@@ -299,6 +310,7 @@ call {varName} {varValue} a b c 1.1 ""1""
             }
         );
     }
+
     [Fact]
     public void CanParseCallKeywordWithoutArg()
     {
@@ -313,6 +325,7 @@ call {varName}
             args => Assert.Empty(args)
         );
     }
+
     [Fact]
     public void CanParseReturnKeywordWithArg()
     {
@@ -325,6 +338,7 @@ return {varName}
             id => id.IsIdentity(varName)
         );
     }
+
     [Fact]
     public void ThrowWhenReturnKeywordNotPassArg()
     {
@@ -332,6 +346,7 @@ return {varName}
 return
 ")));
     }
+
     [Fact]
     public void ThrowWhenReturnKeywordWithManyArgs()
     {
@@ -339,6 +354,7 @@ return
 return a b
 ")));
     }
+
     [Fact]
     public void CanParseParamKeywordWithArg()
     {
@@ -351,6 +367,7 @@ param {varName}
             id => id.IsIdentity(varName)
         );
     }
+
     [Fact]
     public void ThrowWhenParamKeywordNotPassArg()
     {
@@ -358,11 +375,27 @@ param {varName}
 param
 ")));
     }
+
     [Fact]
     public void ThrowWhenParamKeywordWithManyArgs()
     {
         Assert.Throws<InvalidGrammarException>(() => ScriptParser.Parse(LexicalAnalyzer.Analyze(@$"
 param a b
 ")));
+    }
+
+    [Fact]
+    public void AllGrammarTest()
+    {
+        var ast = ScriptParser.Parse(LexicalAnalyzer.Analyze(@$"
+param a
+
+let b = a
+| c
+
+call e f g
+
+return d
+"));
     }
 }

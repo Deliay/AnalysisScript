@@ -4,6 +4,8 @@ using AnalysisScript.Parser.Ast.Basic;
 using AnalysisScript.Parser.Ast.Command;
 using AnalysisScript.Parser.Ast.Operator;
 using System.Reflection;
+using AnalysisScript.Lexical;
+using AnalysisScript.Parser;
 
 namespace AnalysisScript.Interpreter;
 
@@ -174,5 +176,20 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
         OnCommandUpdate = null;
         OnCommentUpdate = null;
         OnLogging = null;
+    }
+
+    public static AsInterpreter Of(VariableContext variableContext, AsAnalysis tree)
+    {
+        return new AsInterpreter(tree, variableContext);
+    }
+
+    public static AsInterpreter Of(VariableContext variableContext, string code)
+    {
+        return Of(variableContext, ScriptParser.Parse(LexicalAnalyzer.Analyze(code))!);
+    }
+
+    public static AsInterpreter Of(string code)
+    {
+        return Of(new VariableContext(), code);
     }
 }

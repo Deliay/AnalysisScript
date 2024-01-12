@@ -18,8 +18,14 @@ public class VariableContext(MethodContext methods)
     }
     public MethodContext Methods { get; } = methods;
 
-    public VariableContext() : this(new()) { }
-
+    public VariableContext() : this(new MethodContext()) { }
+    
+    public VariableContext AddInitializeVariable<T>(string name, T value)
+    {
+        PutInitVariable(new AsIdentity(new Lexical.Token.Identity(name, 0, 0)), value);
+        return this;
+    }
+    
     public void PutInitVariable<T>(AsIdentity id, T value)
     {
         if (_variables.ContainsKey(id))
@@ -111,20 +117,20 @@ public class VariableContext(MethodContext methods)
         }
     }
 
-    public Expression<Func<ValueTask<IContainer>>> GetMethodCallLambda(MethodCallExpression? @this, string name, List<AsObject> methodParams, AsExecutionContext ctx)
+    public Expression<Func<ValueTask<IContainer>>> GetMethodCallLambda(MethodCallExpression? @this, string name, IEnumerable<AsObject> methodParams, AsExecutionContext ctx)
     {
         var exprValues = Args(methodParams, @this, ctx);
         var exprList = exprValues.ToList();
-        var method = Methods.GetMethod(@this, name, exprList);
+        var methodExpr = Methods.GetMethod(@this, name, exprList);
 
-        method = method.Update(method.Object, exprList.Cast<Expression>());
-        var retValueType = ExprTreeHelper.GetTypeToCastMethod(method.Method.ReturnType);
-        method = Expression.Call(retValueType, method);
+        methodExpr = methodExpr.Update(methodExpr.Object, exprList);
+        var retValueType = ExprTreeHelper.GetTypeToCastMethod(methodExpr.Method.ReturnType);
+        methodExpr = Expression.Call(retValueType, methodExpr);
 
-        return Expression.Lambda<Func<ValueTask<IContainer>>>(method);
+        return Expression.Lambda<Func<ValueTask<IContainer>>>(methodExpr);
     }
 
-    public Expression<Func<ValueTask<IContainer>>> GetMethodCallLambda(string name, List<AsObject> methodParams, AsExecutionContext ctx)
+    public Expression<Func<ValueTask<IContainer>>> GetMethodCallLambda(string name, IEnumerable<AsObject> methodParams, AsExecutionContext ctx)
     {
         return GetMethodCallLambda(null!, name, methodParams, ctx);
     }

@@ -80,6 +80,10 @@ public class MethodContext
         {
             throw new NullReferenceException("Can't register instance method to static registry");
         }
+        if (function.ReturnType == typeof(void))
+        {
+            throw new InvalidOperationException("Can't register void method");
+        }
         if (!_rawMethod.TryGetValue(name, out var methodList))
         {
             _rawMethod.Add(name, [(function, null)]);
@@ -109,6 +113,10 @@ public class MethodContext
         if (_rawMethod.Any(k => k.Key == name && k.Value.Any(m => m.Item1 == registration.method)))
         {
             throw new InvalidOperationException("Duplicated instance registered to this context");
+        }
+        if (registration.method.ReturnType == typeof(void))
+        {
+            throw new InvalidOperationException("Can't register void method");
         }
         var constant = Expression.Constant(registration.@this);
         if (!_rawMethod.TryGetValue(name, out var methodList))

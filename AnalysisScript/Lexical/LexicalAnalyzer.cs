@@ -68,6 +68,7 @@ public static class LexicalAnalyzer
                     "return" => new Token.Return(pos, line),
                     _ => new Token.Identity(val, pos, line)
                 };
+                if (current == '\n') yield return new Token.NewLine(pos, line);
             }
             else if (IsQuote(current))
             {

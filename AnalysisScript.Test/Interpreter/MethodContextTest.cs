@@ -29,7 +29,7 @@ public class InstanceRegistry
 
     [AsMethod(Name = "foo")]
     [AsMethod(Name = "bar")]
-    public void Bar() {}
+    public ValueTask Bar() => ValueTask.CompletedTask;
 
     public const string MethodFoo = "foo";
     public const string MethodBar = "bar";
@@ -230,6 +230,19 @@ public class MethodContextTest
         Assert.Throws<InvalidOperationException>(() =>
         {
             ctx.ScanAndRegisterInstanceFunction(inst2);
+        });
+    }
+
+    [Fact]
+    public void WillThrownIfRegisterVoidMethod()
+    {
+        var ctx = new MethodContext();
+        var foo = () => { };
+        var bar = () => ValueTask.CompletedTask;
+        ctx.RegisterInstanceFunction("bar", bar);
+        Assert.Throws<InvalidOperationException>(() =>
+        {
+            ctx.RegisterInstanceFunction("foo", foo);
         });
     }
 }
