@@ -11,17 +11,22 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+      
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: 8.0.x
+        
     - name: Restore dependencies
       run: dotnet restore
+      
     - name: Build
       run: dotnet pack
+      
     - name: publish-to-nuget
       continue-on-error: true
       run: dotnet nuget push **/*-beta.*.nupkg --api-key=${{secrets.NUGET_KEY}} --skip-duplicate --source=https://api.nuget.org/v3/index.json
+      
     - name: publish-to-github
       continue-on-error: true
       run: dotnet nuget push **/*-beta.*.nupkg --api-key=${{secrets.GH_PACKAGE_KEY}} --skip-duplicate --source=https://nuget.pkg.github.com/Deliay/index.json
