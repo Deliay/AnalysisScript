@@ -23,6 +23,11 @@ public class VariableMap : IEnumerable<KeyValuePair<AsIdentity, IContainer>>
         _varMap.Add(newId, val);
     }
 
+    internal void UpdateReference(AsIdentity id, IContainer container)
+    {
+        _varMap[id] = container;
+    }
+
     public bool ContainsKey(AsIdentity id)
     {
         return _varMap.ContainsKey(id);

@@ -166,11 +166,20 @@ public static class ExprTreeHelper
 
         if (!_UnderlyingCastCache.TryGetValue((value.Type, typeof(T)), out var rawConverter))
         {
-            var cast = Expression.TypeAs(value, typeof(T));
+            if (value.Type.IsValueType)
+            {
+                var valueTypeExpr = Expression.Lambda<Func<IContainer, T>>(value, parameter).Compile();
 
-            var rawFunc = Expression.Lambda<Func<IContainer, T>>(cast, parameter).Compile();
+                _UnderlyingCastCache.Add((value.Type, typeof(T)), rawConverter = valueTypeExpr);
+            }
+            else
+            {
+                var cast = Expression.TypeAs(value, typeof(T));
 
-            _UnderlyingCastCache.Add((value.Type, typeof(T)), rawConverter = rawFunc);
+                var rawFunc = Expression.Lambda<Func<IContainer, T>>(cast, parameter).Compile();
+
+                _UnderlyingCastCache.Add((value.Type, typeof(T)), rawConverter = rawFunc);
+            }
         }
         var method = (Func<IContainer, T>)rawConverter;
         return () => method(container);

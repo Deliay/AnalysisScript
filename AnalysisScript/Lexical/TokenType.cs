@@ -5,6 +5,7 @@ public enum TokenType
     Equal = '=',
     Pipe = '|',
     Comment = '#',
+    Reference = '&',
     NewLine = '\n',
     Param,
     Let,

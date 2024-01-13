@@ -16,11 +16,31 @@ public static class LexicalAnalyzer
 
             if (current == '|')
             {
-                yield return new Token.Pipe(pos, line);
+                if (HasMore())
+                {
+                    Peek();
+                    if (current == '|')
+                    {
+                        yield return new Token.Pipe(pos, line, true);
+                    }
+                    else
+                    {
+                        Back();
+                        yield return new Token.Pipe(pos, line);
+                    }
+                }
+                else
+                {
+                    yield return new Token.Pipe(pos, line);
+                }
             }
             else if (current == '=')
             {
                 yield return new Token.Equal(pos, line);
+            }
+            else if (current == '&')
+            {
+                yield return new Token.Reference(pos, line);
             }
             else if (current == '\n') yield return new Token.NewLine(pos, line);
             else if (char.IsWhiteSpace(current)) continue;

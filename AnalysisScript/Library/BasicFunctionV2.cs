@@ -147,17 +147,6 @@ public static class BasicFunctionV2
     public static HashSet<string> GroupString(AsExecutionContext ctx, IEnumerable<string> values)
         => values.ToHashSet();
 
-    public record struct Response(int code, string msg);
-        
-    [AsMethod(Name = "post")]
-    public static async ValueTask<Response> Post<T>(AsExecutionContext executionContext, T body, string address)
-    {
-        using var req = new HttpClient();
-
-        var res = await req.PostAsJsonAsync("https://app.mokahr.com/success", body);
-
-        return await res.Content.ReadFromJsonAsync<Response>();
-    }
     [AsMethod(Name = "limit")]
     [AsMethod(Name = "take")]
     public static IEnumerable<T> Take<T>(AsExecutionContext ctx, IEnumerable<T> source, int count) => source.Take(count);
@@ -179,6 +168,12 @@ public static class BasicFunctionV2
 
     [AsMethod(Name = "not_empty")]
     public static string ThrowIfEmptyString(AsExecutionContext ctx, string instance) => instance.Length == 0 ? instance : throw new NullReferenceException();
+
+    [AsMethod(Name = "format")]
+    public static string Format(AsExecutionContext ctx, string format)
+    {
+        return ctx.VariableContext.Interpolation(format, ctx.CurrentExecuteObject!.LexicalToken);
+    }
 
     public static AsInterpreter RegisterBasicFunctionsV2(this AsInterpreter interpreter)
     {

@@ -1,6 +1,7 @@
 using AnalysisScript.Interpreter;
 using AnalysisScript.Interpreter.Variables;
 using AnalysisScript.Interpreter.Variables.Method;
+using System.Runtime.Intrinsics.X86;
 
 namespace AnalysisScript.Test.Interpreter;
 
@@ -28,10 +29,10 @@ public class InterpreterTest
     public async Task WillExecuteLetAndItsPipelines()
     {
         var paramA = new object();
-        var execTable = new { fnAExecuted = false };
+        var execTable = new { fnAExecuted = false, count = 0 };
         var fnA = (AsExecutionContext ctx, object a) =>
         {
-            execTable = new { fnAExecuted = true };
+            execTable = new { fnAExecuted = true, count = execTable.count + 1 };
             return a;
         }; 
         
@@ -57,6 +58,7 @@ public class InterpreterTest
         
         Assert.Equal(paramA, result);
         Assert.True(execTable.fnAExecuted);
+        Assert.Equal(3, execTable.count);
     }
     [Fact]
     public async Task WillExecuteCallAndCallRightMethod()
@@ -94,10 +96,10 @@ public class InterpreterTest
     public async Task WillCanUnwrapTaskCorrectly()
     {
         var paramA = new object();
-        var execTable = new { fnAExecuted = false };
+        var execTable = new { fnAExecuted = false, count = 0 };
         var fnA = (AsExecutionContext ctx, object a) =>
         {
-            execTable = new { fnAExecuted = true };
+            execTable = new { fnAExecuted = true, count = execTable.count + 1 };
             return Task.FromResult(a);
         }; 
         
@@ -123,15 +125,16 @@ public class InterpreterTest
         
         Assert.Equal(paramA, result);
         Assert.True(execTable.fnAExecuted);
+        Assert.Equal(3, execTable.count);
     }
     [Fact]
     public async Task WillCanUnwrapValueTaskCorrectly()
     {
         var paramA = new object();
-        var execTable = new { fnAExecuted = false };
+        var execTable = new { fnAExecuted = false, count = 0 };
         var fnA = (AsExecutionContext ctx, object a) =>
         {
-            execTable = new { fnAExecuted = true };
+            execTable = new { fnAExecuted = true, count = execTable.count + 1 };
             return ValueTask.FromResult(a);
         }; 
         
@@ -157,5 +160,128 @@ public class InterpreterTest
         
         Assert.Equal(paramA, result);
         Assert.True(execTable.fnAExecuted);
+        Assert.Equal(3, execTable.count);
+    }
+    [Fact]
+    public async Task CanReferenceLastResultInPipe()
+    {
+        var paramA = 1;
+        var incr = (AsExecutionContext ctx, int a, int b) => a + b;
+
+
+        var variables = new VariableContext();
+        variables
+        .AddInitializeVariable("a", paramA)
+            .Methods.RegisterInstanceFunction("incr", incr);
+
+        var interpreter = AsInterpreter.Of(variables,
+            """
+            param a
+
+            let b = a
+            | incr &
+            | incr &
+            | incr &
+
+            return b
+            """);
+
+        Assert.Equal(variables, interpreter.Variables);
+        var result = await interpreter.RunAndReturn<int>(token: default);
+
+        Assert.Equal(8, result);
+    }
+    [Fact]
+    public async Task CanReferenceLastResultInPipeAndInterpolation()
+    {
+        var paramA = 1;
+        var incr = (AsExecutionContext ctx, int a, int b, IEnumerable<int> seq) => seq.Select(c => c + a + b);
+        var sum = (AsExecutionContext ctx, IEnumerable<int> seq) => seq.Sum();
+
+        var variables = new VariableContext();
+        variables
+        .AddInitializeVariable("a", paramA)
+        .AddInitializeVariable<IEnumerable<int>>("b", [1, 2, 3])
+            .Methods.RegisterInstanceFunction("incr", incr)
+                    .RegisterInstanceFunction("sum", sum);
+
+        var interpreter = AsInterpreter.Of(variables,
+            """
+            param a
+            param b
+
+            let c = a
+            | incr & b
+            | sum
+
+            return c
+            """);
+
+        Assert.Equal(variables, interpreter.Variables);
+        var result = await interpreter.RunAndReturn<int>(token: default);
+
+        Assert.Equal(12, result);
+    }
+    [Fact]
+    public async Task CanBlockArgumentSpread()
+    {
+        var paramA = 1;
+        var incr = (AsExecutionContext ctx, IEnumerable<int> seq, int a) => seq.Select(c => c + a);
+        var sum = (AsExecutionContext ctx, IEnumerable<int> seq) => seq.Sum();
+
+        var variables = new VariableContext();
+        variables
+        .AddInitializeVariable("a", paramA)
+        .AddInitializeVariable<IEnumerable<int>>("b", [1, 2, 3])
+            .Methods.RegisterInstanceFunction("incr", incr)
+                    .RegisterInstanceFunction("sum", sum);
+
+        var interpreter = AsInterpreter.Of(variables,
+            """
+            param a
+            param b
+
+            let c = a
+            || incr b &
+            | sum
+
+            return c
+            """);
+
+        Assert.Equal(variables, interpreter.Variables);
+        var result = await interpreter.RunAndReturn<int>(token: default);
+
+        Assert.Equal(9, result);
+    }
+    [Fact]
+    public async Task ThrowIfBlockArgumentSpreadMissingArgumentForMethod()
+    {
+        var paramA = 1;
+        var incr = (AsExecutionContext ctx, IEnumerable<int> seq, int a) => seq.Select(c => c + a);
+        var sum = (AsExecutionContext ctx, IEnumerable<int> seq) => seq.Sum();
+
+        var variables = new VariableContext();
+        variables
+        .AddInitializeVariable("a", paramA)
+        .AddInitializeVariable<IEnumerable<int>>("b", [1, 2, 3])
+            .Methods.RegisterInstanceFunction("incr", incr)
+                    .RegisterInstanceFunction("sum", sum);
+
+        var interpreter = AsInterpreter.Of(variables,
+            """
+            param a
+            param b
+
+            let c = a
+            || incr &
+            | sum
+
+            return c
+            """);
+
+        await Assert.ThrowsAsync<AsRuntimeException>(async () =>
+        {
+            _ = await interpreter.RunAndReturn<int>(token: default);
+        });
     }
 }

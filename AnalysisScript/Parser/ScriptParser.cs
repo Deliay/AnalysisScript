@@ -85,7 +85,7 @@ public static class ScriptParser
         {
             var lex = reader.Current;
             var identity = reader.NextAndReadIdentity();
-            var arguments = reader.ReadArguments().ToList();
+            var arguments = reader.ReadArguments(allowReference: true).ToList();
             yield return new AsPipe((Token.Pipe)lex, identity, arguments);
             if (reader.Is(TokenType.Pipe)) continue;
             if (!reader.MoveNextIfIsOrEof(TokenType.NewLine, TokenType.Comment))
@@ -103,23 +103,28 @@ public static class ScriptParser
         return reader.EnumeratePipes().ToList();
     }
 
-    private static AsObject ReadArgument(IEnumerator<IToken> reader)
+    private static AsObject ReadArgument(IEnumerator<IToken> reader, bool allowReference = false)
     {
-        reader.Require(TokenType.Number, TokenType.Integer, TokenType.String, TokenType.Identity);
+        reader.Require(ArgumentTypes);
         return reader.Current.Type switch
         {
             TokenType.Integer => new AsInteger((Token.Integer)reader.Current),
             TokenType.Number => new AsNumber((Token.Number)reader.Current),
             TokenType.String => new AsString((Token.String)reader.Current),
             TokenType.Identity => new AsIdentity((Token.Identity)reader.Current),
+            TokenType.Reference => allowReference
+                ? new AsIdentity(((Token.Reference)reader.Current).ToIdentity())
+                : throw new InvalidGrammarException(reader.Current, ArgumentTypesWithoutReference),
             _ => throw new InvalidDataException(),
         };
     }
 
     private static readonly TokenType[] ArgumentTypes =
+        [TokenType.Number, TokenType.Integer, TokenType.String, TokenType.Identity, TokenType.Reference];
+    private static readonly TokenType[] ArgumentTypesWithoutReference =
         [TokenType.Number, TokenType.Integer, TokenType.String, TokenType.Identity];
 
-    private static AsObject MoveNextAndReadArgument(IEnumerator<IToken> reader)
+    private static AsObject MoveNextAndReadArgument(IEnumerator<IToken> reader, bool allowReference = false)
     {
         reader.MoveNextAndRequire(ArgumentTypes);
         return reader.Current.Type switch
@@ -127,16 +132,19 @@ public static class ScriptParser
             TokenType.Number => new AsNumber((Token.Number)reader.Current),
             TokenType.Integer => new AsInteger((Token.Integer)reader.Current),
             TokenType.String => new AsString((Token.String)reader.Current),
+            TokenType.Reference => allowReference
+                ? new AsIdentity(((Token.Reference)reader.Current).ToIdentity())
+                : throw new InvalidGrammarException(reader.Current, ArgumentTypesWithoutReference),
             TokenType.Identity => new AsIdentity((Token.Identity)reader.Current),
             _ => throw new InvalidGrammarException(reader.Current, ArgumentTypes),
         };
     }
 
-    private static IEnumerable<AsObject> ReadArguments(this IEnumerator<IToken> reader)
+    private static IEnumerable<AsObject> ReadArguments(this IEnumerator<IToken> reader, bool allowReference = false)
     {
         while (reader.MoveNextAndIs(ArgumentTypes))
         {
-            yield return ReadArgument(reader);
+            yield return ReadArgument(reader, allowReference);
         }
     }
 

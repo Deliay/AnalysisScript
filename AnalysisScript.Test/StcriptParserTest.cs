@@ -94,10 +94,6 @@ let {varName} = {varValue}
         Assert.Single(let.Pipes);
     }
 
-    private void AssertLet()
-    {
-    }
-
     [Fact]
     public void CanParseLetKeywordWithPipes()
     {
@@ -397,5 +393,47 @@ call e f g
 
 return d
 "));
+    }
+
+    [Fact]
+    public void CanParseReferenceIdentityInPipes()
+    {
+        var varName = "a";
+        var varValue = 1234.567;
+        var tokens = LexicalAnalyzer.Analyze(@$"
+let {varName} = {varValue}
+| c &
+");
+        var ast = ScriptParser.Parse(tokens);
+
+        var let = ast.Commands.Cast<AsLet>().First();
+        Assert.Equal(varName, let.Name.Name);
+        var arg = Assert.IsType<AsNumber>(let.Arg);
+        Assert.Equal(varValue, arg.Real);
+        Assert.Single(Assert.Single(let.Pipes).Arguments).IsIdentity(AsIdentity.Reference.LexicalToken.Word);
+    }
+    
+    [Fact]
+    public void ThrowIfReferenceInWrongContext()
+    {
+        Assert.Throws<InvalidGrammarException>(() =>
+        {
+            var tokens = LexicalAnalyzer.Analyze(@$"
+let a = &
+");
+            var ast = ScriptParser.Parse(tokens);
+        });
+    }
+
+    [Fact]
+    public void ThrowIfReferenceInWrongContextInCall()
+    {
+        Assert.Throws<InvalidGrammarException>(() =>
+        {
+            var tokens = LexicalAnalyzer.Analyze(@$"
+call a &
+");
+            var ast = ScriptParser.Parse(tokens);
+        });
     }
 }

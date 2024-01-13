@@ -47,6 +47,8 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
     {
         var initialValueId = Variables.Storage(initialValue);
         if (pipes.Count == 0) return initialValueId;
+        var initContainer = Variables.GetVariableContainer(initialValueId);
+        Variables.AddOrUpdateVariable(AsIdentity.Reference, initContainer);
 
         var initValue = Variables.LambdaValueOf(initialValueId);
         var value = initValue;
@@ -56,10 +58,13 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
         {
             ctx.CurrentExecuteObject = pipe;
 
-            var pipeValueGetter = Variables.GetMethodCallLambda(value, pipe.FunctionName.Name, pipe.Arguments, ctx).Compile();
+            var firstArg = pipe.DontSpreadArg ? null : value;
+            var pipeValueGetter = Variables.GetMethodCallLambda(firstArg, pipe.FunctionName.Name, pipe.Arguments, ctx).Compile();
+
             var nextValue = await pipeValueGetter();
             var sanitizedValue = await ExprTreeHelper.SanitizeLambdaExpression(nextValue);
-            
+
+            Variables.AddOrUpdateVariable(AsIdentity.Reference, sanitizedValue);
             value = Variables.LambdaValueOf(lastValueId = Variables.AddTempVar(sanitizedValue, pipe.LexicalToken));
         }
 
@@ -160,6 +165,7 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
     public async ValueTask Run(AsExecutionContext ctx) {
         try
         {
+            ctx.VariableContext = Variables;
             foreach (var cmd in Tree.Commands)
             {
                 await RunCommand(ctx, cmd);
