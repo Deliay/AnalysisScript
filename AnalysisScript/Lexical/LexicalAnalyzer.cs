@@ -22,6 +22,10 @@ public static class LexicalAnalyzer
             {
                 yield return new Token.Equal(pos, line);
             }
+            else if (current == '&')
+            {
+                yield return new Token.Reference(pos, line);
+            }
             else if (current == '\n') yield return new Token.NewLine(pos, line);
             else if (char.IsWhiteSpace(current)) continue;
             else if (char.IsNumber(current))

@@ -30,6 +30,13 @@ public class LexicalAnalysisTest
         Assert.Equal(2, tokens.Count());
     }
     [Fact]
+    public void CanResolveReference()
+    {
+        var tokens = LexicalAnalyzer.Analyze("&");
+        Assert.Contains(tokens, token => token.Type == TokenType.Reference);
+        Assert.Equal(2, tokens.Count());
+    }
+    [Fact]
     public void CanResolveEqual()
     {
         var tokens = LexicalAnalyzer.Analyze("=");

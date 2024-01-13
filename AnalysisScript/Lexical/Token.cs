@@ -29,6 +29,11 @@ public static class Token
         public readonly TokenType Type => TokenType.Pipe;
         public bool IsConstant { get; } = false;
     }
+    public record struct Reference(int Pos, int Line) : IToken
+    {
+        public readonly TokenType Type => TokenType.Reference;
+        public bool IsConstant { get; } = false;
+    }
     public record struct Call(int Pos, int Line) : IToken
     {
         public readonly TokenType Type => TokenType.Call;
