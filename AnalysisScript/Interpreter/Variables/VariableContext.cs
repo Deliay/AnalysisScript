@@ -143,7 +143,10 @@ public class VariableContext(MethodContext methods)
 
     public string Interpolation(AsString str)
     {
-        var currentStr = str.RawContent;
+        return Interpolation(str.RawContent, str.LexicalToken);
+    }
+    public string Interpolation(string currentStr, IToken token)
+    {
         List<string> slices = [];
         var pos = 0;
         var left = currentStr.IndexOf("${");
@@ -153,7 +156,7 @@ public class VariableContext(MethodContext methods)
         {
             var varName = currentStr[(left + 2)..right];
             if (!_variables.TryGetValue(varName, out var value))
-                throw new UnknownVariableException(str.LexicalToken);
+                throw new UnknownVariableException(varName, token);
 
             slices.Add(currentStr[pos..left]);
             slices.Add(value.UnderlyingToString() ?? "(null)");

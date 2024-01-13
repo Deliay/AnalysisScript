@@ -169,6 +169,12 @@ public static class BasicFunctionV2
     [AsMethod(Name = "not_empty")]
     public static string ThrowIfEmptyString(AsExecutionContext ctx, string instance) => instance.Length == 0 ? instance : throw new NullReferenceException();
 
+    [AsMethod(Name = "format")]
+    public static string Format(AsExecutionContext ctx, string format)
+    {
+        return ctx.VariableContext.Interpolation(format, ctx.CurrentExecuteObject!.LexicalToken);
+    }
+
     public static AsInterpreter RegisterBasicFunctionsV2(this AsInterpreter interpreter)
     {
         interpreter.Variables.Methods.ScanAndRegisterStaticFunction(typeof(BasicFunctionV2));

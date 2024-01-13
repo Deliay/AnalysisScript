@@ -165,6 +165,7 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
     public async ValueTask Run(AsExecutionContext ctx) {
         try
         {
+            ctx.VariableContext = Variables;
             foreach (var cmd in Tree.Commands)
             {
                 await RunCommand(ctx, cmd);
