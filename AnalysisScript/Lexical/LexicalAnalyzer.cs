@@ -16,7 +16,23 @@ public static class LexicalAnalyzer
 
             if (current == '|')
             {
-                yield return new Token.Pipe(pos, line);
+                if (HasMore())
+                {
+                    Peek();
+                    if (current == '|')
+                    {
+                        yield return new Token.Pipe(pos, line, true);
+                    }
+                    else
+                    {
+                        Back();
+                        yield return new Token.Pipe(pos, line);
+                    }
+                }
+                else
+                {
+                    yield return new Token.Pipe(pos, line);
+                }
             }
             else if (current == '=')
             {

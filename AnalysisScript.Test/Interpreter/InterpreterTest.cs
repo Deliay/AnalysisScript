@@ -222,4 +222,66 @@ public class InterpreterTest
 
         Assert.Equal(12, result);
     }
+    [Fact]
+    public async Task CanBlockArgumentSpread()
+    {
+        var paramA = 1;
+        var incr = (AsExecutionContext ctx, IEnumerable<int> seq, int a) => seq.Select(c => c + a);
+        var sum = (AsExecutionContext ctx, IEnumerable<int> seq) => seq.Sum();
+
+        var variables = new VariableContext();
+        variables
+        .AddInitializeVariable("a", paramA)
+        .AddInitializeVariable<IEnumerable<int>>("b", [1, 2, 3])
+            .Methods.RegisterInstanceFunction("incr", incr)
+                    .RegisterInstanceFunction("sum", sum);
+
+        var interpreter = AsInterpreter.Of(variables,
+            """
+            param a
+            param b
+
+            let c = a
+            || incr b &
+            | sum
+
+            return c
+            """);
+
+        Assert.Equal(variables, interpreter.Variables);
+        var result = await interpreter.RunAndReturn<int>(token: default);
+
+        Assert.Equal(9, result);
+    }
+    [Fact]
+    public async Task ThrowIfBlockArgumentSpreadMissingArgumentForMethod()
+    {
+        var paramA = 1;
+        var incr = (AsExecutionContext ctx, IEnumerable<int> seq, int a) => seq.Select(c => c + a);
+        var sum = (AsExecutionContext ctx, IEnumerable<int> seq) => seq.Sum();
+
+        var variables = new VariableContext();
+        variables
+        .AddInitializeVariable("a", paramA)
+        .AddInitializeVariable<IEnumerable<int>>("b", [1, 2, 3])
+            .Methods.RegisterInstanceFunction("incr", incr)
+                    .RegisterInstanceFunction("sum", sum);
+
+        var interpreter = AsInterpreter.Of(variables,
+            """
+            param a
+            param b
+
+            let c = a
+            || incr &
+            | sum
+
+            return c
+            """);
+
+        await Assert.ThrowsAsync<AsRuntimeException>(async () =>
+        {
+            _ = await interpreter.RunAndReturn<int>(token: default);
+        });
+    }
 }

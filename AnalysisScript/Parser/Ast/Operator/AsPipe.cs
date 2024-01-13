@@ -7,9 +7,11 @@ public class AsPipe(Token.Pipe lexical, AsIdentity fn, List<AsObject> args) : As
 {
     public AsIdentity FunctionName => fn;
     public List<AsObject> Arguments => args;
+    public bool DontSpreadArg => LexicalToken.BlockSpread;
 
     public override string ToString()
     {
-        return $"| {FunctionName} {string.Join(' ', Arguments)}";
+        var symbol = DontSpreadArg ? "||" : "|";
+        return $"{symbol} {FunctionName} {string.Join(' ', Arguments)}";
     }
 }

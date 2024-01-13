@@ -58,7 +58,9 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
         {
             ctx.CurrentExecuteObject = pipe;
 
-            var pipeValueGetter = Variables.GetMethodCallLambda(value, pipe.FunctionName.Name, pipe.Arguments, ctx).Compile();
+            var firstArg = pipe.DontSpreadArg ? null : value;
+            var pipeValueGetter = Variables.GetMethodCallLambda(firstArg, pipe.FunctionName.Name, pipe.Arguments, ctx).Compile();
+
             var nextValue = await pipeValueGetter();
             var sanitizedValue = await ExprTreeHelper.SanitizeLambdaExpression(nextValue);
 
