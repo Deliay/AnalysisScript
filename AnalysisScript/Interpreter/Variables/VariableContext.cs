@@ -50,6 +50,12 @@ public class VariableContext(MethodContext methods)
         _variables.Add(id, value);
     }
 
+    internal void AddOrUpdateVariable(AsIdentity id, IContainer value)
+    {
+        if (_variables.ContainsKey(id))
+            _variables.UpdateReference(id, value);
+        else _variables.Add(id, value);
+    }
 
     public bool HasVariable(AsIdentity id) => _variables.ContainsKey(id);
 

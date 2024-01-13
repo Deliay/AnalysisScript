@@ -47,6 +47,8 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
     {
         var initialValueId = Variables.Storage(initialValue);
         if (pipes.Count == 0) return initialValueId;
+        var initContainer = Variables.GetVariableContainer(initialValueId);
+        Variables.AddOrUpdateVariable(AsIdentity.Reference, initContainer);
 
         var initValue = Variables.LambdaValueOf(initialValueId);
         var value = initValue;
@@ -59,7 +61,8 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
             var pipeValueGetter = Variables.GetMethodCallLambda(value, pipe.FunctionName.Name, pipe.Arguments, ctx).Compile();
             var nextValue = await pipeValueGetter();
             var sanitizedValue = await ExprTreeHelper.SanitizeLambdaExpression(nextValue);
-            
+
+            Variables.AddOrUpdateVariable(AsIdentity.Reference, sanitizedValue);
             value = Variables.LambdaValueOf(lastValueId = Variables.AddTempVar(sanitizedValue, pipe.LexicalToken));
         }
 

@@ -33,6 +33,8 @@ public static class Token
     {
         public readonly TokenType Type => TokenType.Reference;
         public bool IsConstant { get; } = false;
+
+        public readonly Identity ToIdentity() => new("&", Pos, Line);
     }
     public record struct Call(int Pos, int Line) : IToken
     {
