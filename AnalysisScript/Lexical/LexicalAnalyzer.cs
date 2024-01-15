@@ -38,6 +38,9 @@ public static class LexicalAnalyzer
             {
                 yield return new Token.Equal(pos, line);
             }
+            else if (current == '[') yield return new Token.ArrayStart(pos, line);
+            else if (current == ',') yield return new Token.Comma(pos, line);
+            else if (current == ']') yield return new Token.ArrayEnd(pos, line);
             else if (current == '&')
             {
                 yield return new Token.Reference(pos, line);

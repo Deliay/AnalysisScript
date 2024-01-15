@@ -30,6 +30,27 @@ public class LexicalAnalysisTest
         Assert.Equal(2, tokens.Count());
     }
     [Fact]
+    public void CanResolveArrayStart()
+    {
+        var tokens = LexicalAnalyzer.Analyze("[");
+        Assert.Contains(tokens, token => token.Type == TokenType.ArrayStart);
+        Assert.Equal(2, tokens.Count());
+    }
+    [Fact]
+    public void CanResolveArrayEnd()
+    {
+        var tokens = LexicalAnalyzer.Analyze("]");
+        Assert.Contains(tokens, token => token.Type == TokenType.ArrayEnd);
+        Assert.Equal(2, tokens.Count());
+    }
+    [Fact]
+    public void CanResolveComma()
+    {
+        var tokens = LexicalAnalyzer.Analyze(",");
+        Assert.Contains(tokens, token => token.Type == TokenType.Comma);
+        Assert.Equal(2, tokens.Count());
+    }
+    [Fact]
     public void CanResolveBlockPipe()
     {
         var tokens = LexicalAnalyzer.Analyze("||").ToList();
