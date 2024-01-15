@@ -1,7 +1,6 @@
 using AnalysisScript.Interpreter;
 using AnalysisScript.Interpreter.Variables;
 using AnalysisScript.Interpreter.Variables.Method;
-using System.Runtime.Intrinsics.X86;
 
 namespace AnalysisScript.Test.Interpreter;
 

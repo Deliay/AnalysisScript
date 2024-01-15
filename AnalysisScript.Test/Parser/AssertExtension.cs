@@ -27,7 +27,7 @@ public static class AssertExtension
     }
 
 
-    public static AsIdentity IsIdentity(this AsObject asObject, string? id)
+    public static AsIdentity IsIdentity(this AsObject asObject, string? id = null)
     {
         var asId = Assert.IsType<AsIdentity>(asObject);
         if (id is not null) Assert.Equal(id, asId.Name);
@@ -35,6 +35,24 @@ public static class AssertExtension
         return asId;
     }
 
+    public static AsArray IsArray(this AsObject asObject, IEnumerable<string>? matchAllToString = null)
+    {
+        var asArray = Assert.IsType<AsArray>(asObject);
+
+        if (matchAllToString is not null)
+        {
+            var items = asArray.Items;
+            var matchList = matchAllToString.ToList();
+            Assert.Equal(matchList.Count, items.Count);
+            
+            foreach (var (first, second) in matchList.Zip(items))
+            {
+                Assert.Equal(first, second.ToString());
+            }
+        }
+
+        return asArray;
+    }
 
     public static AsString IsString(this AsObject asObject, string? str)
     {
@@ -52,7 +70,7 @@ public static class AssertExtension
         return number;
     }
 
-    public static AsComment IsComment(this AsObject asObject, string comment = default)
+    public static AsComment IsComment(this AsObject asObject, string? comment = default)
     {
         var asComment = Assert.IsType<AsComment>(asObject);
         if (comment is not null) Assert.Equal(comment, asComment.Content);

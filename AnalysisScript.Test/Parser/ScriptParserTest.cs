@@ -1,21 +1,21 @@
-namespace AnalysisScript.Test;
+namespace AnalysisScript.Test.Parser;
 
-using AnalysisScript.Lexical;
+using Lexical;
 using AnalysisScript.Parser;
 using AnalysisScript.Parser.Ast.Basic;
 using AnalysisScript.Parser.Ast.Command;
-using AnalysisScript.Test.Parser;
 
-public class StcriptParserTest
+public class ScriptParserTest
 {
     [Fact]
     public void CanParseLetKeyword()
     {
-        var varName = "a";
-        var varValue = "1";
-        var ast = ScriptParser.Parse(LexicalAnalyzer.Analyze(@$"
-let {varName} = ""{varValue}""
-"));
+        const string varName = "a";
+        const string varValue = "1";
+        var ast = ScriptParser.Parse(LexicalAnalyzer.Analyze(
+            $"""
+                  let {varName} = "{varValue}"
+                  """))!;
 
         var let = ast.Commands.Cast<AsLet>().First();
         Assert.Equal(varName, let.Name.Name);
@@ -28,9 +28,10 @@ let {varName} = ""{varValue}""
     {
         var varName = "a";
         var varValue = 1234.567;
-        var ast = ScriptParser.Parse(LexicalAnalyzer.Analyze(@$"
-let {varName} = {varValue}
-"));
+        var ast = ScriptParser.Parse(LexicalAnalyzer.Analyze(
+            $"""
+                 let {varName} = {varValue}
+                 """))!;
 
         var let = ast.Commands.Cast<AsLet>().First();
         Assert.Equal(varName, let.Name.Name);
@@ -45,7 +46,7 @@ let {varName} = {varValue}
         var varValue = 1234;
         var ast = ScriptParser.Parse(LexicalAnalyzer.Analyze(@$"
 let {varName} = {varValue}
-"));
+"))!;
 
         var let = ast.Commands.Cast<AsLet>().First();
         Assert.Equal(varName, let.Name.Name);
@@ -60,7 +61,7 @@ let {varName} = {varValue}
         var varValue = "b";
         var ast = ScriptParser.Parse(LexicalAnalyzer.Analyze(@$"
 let {varName} = {varValue}
-"));
+"))!;
 
         var let = ast.Commands.Cast<AsLet>().First();
         Assert.Equal(varName, let.Name.Name);
@@ -85,7 +86,7 @@ let a = let
 let {varName} = {varValue}
 | b
 ");
-        var ast = ScriptParser.Parse(tokens);
+        var ast = ScriptParser.Parse(tokens)!;
 
         var let = ast.Commands.Cast<AsLet>().First();
         Assert.Equal(varName, let.Name.Name);
@@ -103,7 +104,7 @@ let {varName} = {varValue}
 let {varName} = {varValue}
 | b
 | c
-"));
+"))!;
 
         var let = ast.Commands.Cast<AsLet>().First();
         Assert.Equal(varName, let.Name.Name);
@@ -129,7 +130,7 @@ let {varName} = {varValue}
 let {varName} = {varValue}
 | b
 | c
-"));
+"))!;
 
         Assert.Equal(3, ast.Commands.Count);
 
@@ -167,7 +168,7 @@ let {varName} = {varValue}
 let {varName} = {varValue}
 | b 1.1 ""1"" 1
 | c e ""1"" 1.1 f
-"));
+"))!;
 
         Assert.Equal(3, ast.Commands.Count);
 
@@ -247,7 +248,7 @@ let {varName} = {varValue}
 let {varName} = {varValue}
 | b
 | c
-"));
+"))!;
 
         Assert.Equal(3, ast.Commands.Count);
 
@@ -275,7 +276,7 @@ let {varName} = {varValue}
         var varValue = 1234.567;
         var ast = ScriptParser.Parse(LexicalAnalyzer.Analyze(@$"
 call {varName} {varValue}
-"));
+"))!;
         Assert.Single(ast.Commands);
         ast.Commands[0].IsCall(
             id => id.IsIdentity(varName),
@@ -290,7 +291,7 @@ call {varName} {varValue}
         var varValue = 1234.567;
         var ast = ScriptParser.Parse(LexicalAnalyzer.Analyze(@$"
 call {varName} {varValue} a b c 1.1 ""1""
-"));
+"))!;
         Assert.Single(ast.Commands);
         ast.Commands[0].IsCall(
             id => id.IsIdentity(varName),
@@ -311,14 +312,13 @@ call {varName} {varValue} a b c 1.1 ""1""
     public void CanParseCallKeywordWithoutArg()
     {
         var varName = "a";
-        var varValue = 1234.567;
         var ast = ScriptParser.Parse(LexicalAnalyzer.Analyze(@$"
 call {varName}
-"));
+"))!;
         Assert.Single(ast.Commands);
         ast.Commands[0].IsCall(
             id => id.IsIdentity(varName),
-            args => Assert.Empty(args)
+            Assert.Empty
         );
     }
 
@@ -328,7 +328,7 @@ call {varName}
         var varName = "a";
         var ast = ScriptParser.Parse(LexicalAnalyzer.Analyze(@$"
 return {varName}
-"));
+"))!;
         Assert.Single(ast.Commands);
         ast.Commands[0].IsReturn(
             id => id.IsIdentity(varName)
@@ -357,7 +357,7 @@ return a b
         var varName = "a";
         var ast = ScriptParser.Parse(LexicalAnalyzer.Analyze(@$"
 param {varName}
-"));
+"))!;
         Assert.Single(ast.Commands);
         ast.Commands[0].IsParam(
             id => id.IsIdentity(varName)
@@ -383,11 +383,13 @@ param a b
     [Fact]
     public void AllGrammarTest()
     {
-        var ast = ScriptParser.Parse(LexicalAnalyzer.Analyze(@$"
+        ScriptParser.Parse(LexicalAnalyzer.Analyze(@$"
 param a
 
 let b = a
-| c
+| c [1,2,3]
+| d &
+|| d & [[1,2], &]
 
 call e f g
 
@@ -404,7 +406,7 @@ return d
 let {varName} = {varValue}
 | c &
 ");
-        var ast = ScriptParser.Parse(tokens);
+        var ast = ScriptParser.Parse(tokens)!;
 
         var let = ast.Commands.Cast<AsLet>().First();
         Assert.Equal(varName, let.Name.Name);
@@ -414,6 +416,107 @@ let {varName} = {varValue}
     }
     
     [Fact]
+    public void CanParseArrayInLetParams()
+    {
+        var varName = "a";
+        var tokens = LexicalAnalyzer.Analyze(@$"
+let {varName} = [a, b, c]
+");
+        var ast = ScriptParser.Parse(tokens)!;
+
+        var let = ast.Commands.Cast<AsLet>().First();
+        Assert.Equal(varName, let.Name.Name);
+        var arg = Assert.IsType<AsArray>(let.Arg);
+        Assert.Contains(arg.Items, item => item.IsIdentity().Name == "a");
+        Assert.Contains(arg.Items, item => item.IsIdentity().Name == "b");
+        Assert.Contains(arg.Items, item => item.IsIdentity().Name == "c");
+    }
+    
+    [Fact]
+    public void CanParseArrayInLetParamsAndElseWhere()
+    {
+        var varName = "a";
+        var tokens = LexicalAnalyzer.Analyze(@$"
+let {varName} = [a, b, c]
+| a [c,1.5,""2""]
+
+");
+        var ast = ScriptParser.Parse(tokens)!;
+
+        var let = ast.Commands.Cast<AsLet>().First();
+        Assert.Equal(varName, let.Name.Name);
+
+        let.Arg.IsArray(["a", "b", "c"]);
+
+
+        Assert.Single(Assert.Single(let.Pipes).Arguments).IsArray(["c", "1.5", "\"2\""]);
+    }
+    
+    [Fact]
+    public void CanParseArrayWithReferenceInPipe()
+    {
+        var varName = "a";
+        var tokens = LexicalAnalyzer.Analyze(@$"
+let {varName} = [a, b, c]
+| a [&]
+
+");
+        var ast = ScriptParser.Parse(tokens)!;
+
+        var let = ast.Commands.Cast<AsLet>().First();
+        Assert.Equal(varName, let.Name.Name);
+
+        let.Arg.IsArray(["a", "b", "c"]);
+
+
+        Assert.Single(Assert.Single(let.Pipes).Arguments).IsArray(["&"]);
+    }
+
+    [Fact]
+    public void CanParseEmptyArray()
+    {
+        var varName = "a";
+        var tokens = LexicalAnalyzer.Analyze(@$"
+let {varName} = []
+| a []
+
+");
+        var ast = ScriptParser.Parse(tokens)!;
+
+        var let = ast.Commands.Cast<AsLet>().First();
+        Assert.Equal(varName, let.Name.Name);
+
+        let.Arg.IsArray([]);
+
+
+        Assert.Single(Assert.Single(let.Pipes).Arguments).IsArray([]);
+    }
+
+    [Fact]
+    public void ThrowIfArrayNotClose()
+    {
+        Assert.Throws<InvalidGrammarException>(() =>
+        {
+            var tokens = LexicalAnalyzer.Analyze(@$"
+let a = [
+");
+            _ = ScriptParser.Parse(tokens);
+        });
+    }
+
+    [Fact]
+    public void ThrowIfArrayEmptyButOnlyComma()
+    {
+        Assert.Throws<InvalidGrammarException>(() =>
+        {
+            var tokens = LexicalAnalyzer.Analyze(@$"
+let a = [,]
+");
+            _ = ScriptParser.Parse(tokens);
+        });
+    }
+
+    [Fact]
     public void ThrowIfReferenceInWrongContext()
     {
         Assert.Throws<InvalidGrammarException>(() =>
@@ -421,7 +524,7 @@ let {varName} = {varValue}
             var tokens = LexicalAnalyzer.Analyze(@$"
 let a = &
 ");
-            var ast = ScriptParser.Parse(tokens);
+            _ = ScriptParser.Parse(tokens);
         });
     }
 
@@ -430,10 +533,13 @@ let a = &
     {
         Assert.Throws<InvalidGrammarException>(() =>
         {
-            var tokens = LexicalAnalyzer.Analyze(@$"
-call a &
-");
-            var ast = ScriptParser.Parse(tokens);
+            var tokens = LexicalAnalyzer.Analyze(
+                """
+
+                     call a &
+
+                     """);
+            _ = ScriptParser.Parse(tokens);
         });
     }
 }

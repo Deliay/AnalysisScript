@@ -78,9 +78,16 @@ public static class LexicalAnalyzer
             else if (IsIdentityStart(current))
             {
                 var val = $"{current}";
-                while (HasMore() && IsIdentity(Peek()))
+                while (HasMore())
                 {
-                    val += current;
+                    if (IsIdentity(Peek()))
+                    {
+                        val += current;
+                    }
+                    else
+                    {
+                        Back(); break;
+                    }
                 }
 
                 yield return val switch
@@ -91,7 +98,6 @@ public static class LexicalAnalyzer
                     "return" => new Token.Return(pos, line),
                     _ => new Token.Identity(val, pos, line)
                 };
-                if (current == '\n') yield return new Token.NewLine(pos, line);
             }
             else if (IsQuote(current))
             {

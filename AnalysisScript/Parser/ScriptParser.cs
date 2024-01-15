@@ -20,7 +20,7 @@ public static class ScriptParser
         return types.Any(type => type == reader.Current.Type);
     }
 
-    private static bool MoveNextIfIsOrEof(this IEnumerator<IToken> reader, params TokenType[] types)
+    private static bool IsOrEofAndMoveNext(this IEnumerator<IToken> reader, params TokenType[] types)
     {
         return reader.Is(types) && reader.MoveNext();
     }
@@ -88,10 +88,10 @@ public static class ScriptParser
             var arguments = reader.ReadArguments(allowReference: true).ToList();
             yield return new AsPipe((Token.Pipe)lex, identity, arguments);
             if (reader.Is(TokenType.Pipe)) continue;
-            if (!reader.MoveNextIfIsOrEof(TokenType.NewLine, TokenType.Comment))
+            if (!reader.IsOrEofAndMoveNext(TokenType.NewLine, TokenType.Comment))
                 break;
             while (reader.Is(SkipTypes))
-                if (!reader.MoveNextIfIsOrEof(TokenType.NewLine, TokenType.Comment))
+                if (!reader.IsOrEofAndMoveNext(TokenType.NewLine, TokenType.Comment))
                     break;
         }
     }
@@ -103,6 +103,23 @@ public static class ScriptParser
         return reader.EnumeratePipes().ToList();
     }
 
+    private static IEnumerable<AsObject> ReadArrayObjects(IEnumerator<IToken> reader, bool allowReference = false)
+    {
+        do
+        {
+            if (reader.MoveNextAndIs(TokenType.ArrayEnd)) yield break;
+            var item = ReadArgument(reader, allowReference);
+            yield return item;
+        } while (reader.MoveNextAndIs(TokenType.Comma));
+    }
+    
+    private static AsArray ReadArray(IEnumerator<IToken> reader, bool allowReference = false)
+    {
+        var current = reader.Current;
+        var array = ReadArrayObjects(reader, allowReference).ToList();
+        return new AsArray((Token.ArrayStart)current, array);
+    }
+
     private static AsObject ReadArgument(IEnumerator<IToken> reader, bool allowReference = false)
     {
         reader.Require(ArgumentTypes);
@@ -112,6 +129,7 @@ public static class ScriptParser
             TokenType.Number => new AsNumber((Token.Number)reader.Current),
             TokenType.String => new AsString((Token.String)reader.Current),
             TokenType.Identity => new AsIdentity((Token.Identity)reader.Current),
+            TokenType.ArrayStart => ReadArray(reader, allowReference),
             TokenType.Reference => allowReference
                 ? new AsIdentity(((Token.Reference)reader.Current).ToIdentity())
                 : throw new InvalidGrammarException(reader.Current, ArgumentTypesWithoutReference),
@@ -120,9 +138,9 @@ public static class ScriptParser
     }
 
     private static readonly TokenType[] ArgumentTypes =
-        [TokenType.Number, TokenType.Integer, TokenType.String, TokenType.Identity, TokenType.Reference];
+        [TokenType.Number, TokenType.Integer, TokenType.String, TokenType.Identity, TokenType.Reference, TokenType.ArrayStart];
     private static readonly TokenType[] ArgumentTypesWithoutReference =
-        [TokenType.Number, TokenType.Integer, TokenType.String, TokenType.Identity];
+        [TokenType.Number, TokenType.Integer, TokenType.String, TokenType.Identity, TokenType.ArrayStart];
 
     private static AsObject MoveNextAndReadArgument(IEnumerator<IToken> reader, bool allowReference = false)
     {
@@ -132,6 +150,7 @@ public static class ScriptParser
             TokenType.Number => new AsNumber((Token.Number)reader.Current),
             TokenType.Integer => new AsInteger((Token.Integer)reader.Current),
             TokenType.String => new AsString((Token.String)reader.Current),
+            TokenType.ArrayStart => ReadArray(reader, allowReference),
             TokenType.Reference => allowReference
                 ? new AsIdentity(((Token.Reference)reader.Current).ToIdentity())
                 : throw new InvalidGrammarException(reader.Current, ArgumentTypesWithoutReference),
@@ -157,7 +176,10 @@ public static class ScriptParser
         reader.MoveNextAndRequire(TokenType.Equal);
         var argument = MoveNextAndReadArgument(reader);
 
-        reader.MoveNextAndRequire(TokenType.NewLine);
+        if (!reader.MoveNextAndIs(TokenType.NewLine))
+        {
+            return new AsLet((Token.Let)lex, identity, argument, []);
+        }
 
         var pipes = ReadPipes(reader);
 
@@ -167,7 +189,7 @@ public static class ScriptParser
     private static AsComment ReadComment(IEnumerator<IToken> reader)
     {
         var comment = new AsComment((Token.Comment)reader.Current);
-        reader.MoveNextIfIsOrEof(SkipTypes);
+        reader.IsOrEofAndMoveNext(SkipTypes);
         return comment;
     }
 
