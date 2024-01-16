@@ -13,12 +13,18 @@ var variables = new VariableContext()
     .AddInitialzieVariable("b", new List<int>() { 2, 3, 4 });
 
 // register custom methods
-var incrSingle = (int x) => ValueTask.FromResult(p + 1);
-var incrSequence = (IEnumerable<int> xs)
+var incrSingle = (AsExecutionContext ctx, int x)
+    => ValueTask.FromResult(p + 1);
+
+var incrSequence = (AsExecutionContext ctx, IEnumerable<int> xs)
     => ValueTask.CompleteTask(xs.Select(x => x + 1));
+
+var sumSequence = (AsExecutionContext ctx, IEnumerable<int> xs)
+    => xs.Sum();
 
 variables.Methods.RegisterInstanceFunction("inc", incrSingle);
 variables.Methods.RegisterInstanceFunction("inc", incrSequence);
+variables.Methods.RegisterInstanceFunction("sum", sumSequence);
 
 // run code and get return value
 var interpreter = AsInterpreter.Of(variables,
@@ -29,17 +35,22 @@ param b
 let first = c
 | inc
 
-let tail = d
-| inc
-| join "," 
+let firstArray = [0, first]
+| join ","
 
-let res = "${first},${tail}"
+let sum = b
+| inc
+| sum
+# use '||' to allow '&' and make '&' reference to previous 'sum' result 
+|| sum [1, &]
+
+let res = "${firstArray}|${sum}"
 
 return res
 """);
 var result = await interpreter.RunAndReturn<string>();
 
-// Output: 2,3,4,5
+// Output: 0,2|13
 Console.WriteLine(result);
 ```
 
@@ -52,8 +63,12 @@ let b = arg1
 | fn arg2 arg3
 | fn2 arg2
 | fn3
+# block arg1 pass to current pipe function
+# symbol '&' reference to return value of 'fn3'
+|| fn4 & arg2 arg3
+|| fn5 [&, arg2, arg3]
 
-call fn4 arg1 arg2 arg3
+call fn6 arg1 arg2 arg3
 
 let d = "string interpolation ${c}"
 let e = "string ${c} interpolation"
