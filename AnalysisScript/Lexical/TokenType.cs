@@ -2,14 +2,15 @@
 
 public enum TokenType
 {
-    Equal = '=',
-    Pipe = '|',
+    NewLine = '\n',
     Comment = '#',
     Reference = '&',
+    Star = '*',
+    Comma = ',',
+    Equal = '=',
     ArrayStart = '[',
     ArrayEnd = ']',
-    Comma = ',',
-    NewLine = '\n',
+    Pipe = '|',
     Param,
     Let,
     Call,

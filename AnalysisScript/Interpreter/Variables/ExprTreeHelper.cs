@@ -24,7 +24,7 @@ public static class ExprTreeHelper
     {
         public static string CollectionToString(TContainer container)
         {
-            return $"{string.Join(',', container.Take(3))}...共{container.Count()}项";
+            return $"{string.Join(',', container.Take(3))}...Total {container.Count()} item(s)";
         }
     }
     private static readonly Dictionary<Type, MethodInfo> EnumerableToStringMethods = [];
