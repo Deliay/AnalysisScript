@@ -3,7 +3,7 @@ A super mini script for data processing
 
 ## Examples
 
-### Basic usage (with BFL)
+### Basic usage
 ```csharp
 using AnalysisScript.Library;
 
