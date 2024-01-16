@@ -33,6 +33,18 @@ public static class BasicFunctionV2
     private static readonly MethodInfo SelectMethod = typeof(BasicFunctionV2).GetMethod("SelectWrapper")
                                                       ?? throw new InvalidProgramException("Can't find Select(IEnumerable<>, Func<,>) method from Enumerable class");
 
+    private static readonly Dictionary<(Type, Type), MethodInfo> ConstructedSelectMethod = [];
+
+    private static MethodInfo ConstructSelectMethod(Type from, Type to)
+    {
+        if (!ConstructedSelectMethod.TryGetValue((from, to), out var method))
+        {
+            ConstructedSelectMethod.Add((from, to), method = SelectMethod.MakeGenericMethod(from ,to));
+        }
+
+        return method;
+    }
+    
     public static IEnumerable<R> SelectWrapper<T, R>(IEnumerable<T> source, Func<T, R> mapper) => source.Select(mapper);
 
     [AsMethod(Name = "select")]
@@ -44,7 +56,7 @@ public static class BasicFunctionV2
         var thisParam = ExprTreeHelper.GetConstantValueLambda(@this);
 
         var mapperMethod = Expression.Lambda(property, param);
-        var selectMethod = SelectMethod.MakeGenericMethod([typeof(T), property.Type]);
+        var selectMethod = ConstructSelectMethod(typeof(T), property.Type);
 
         var callSelect = Expression.Call(null, selectMethod, thisParam, mapperMethod);
 

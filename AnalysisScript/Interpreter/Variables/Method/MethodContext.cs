@@ -74,6 +74,10 @@ public class MethodContext
         return this;
     }
 
+    public MethodContext RegisterStaticFunction(string name, Delegate function)
+    {
+        return RegisterStaticFunction(name, function.Method);
+    }
     public MethodContext RegisterStaticFunction(string name, MethodInfo function)
     {
         if (!function.IsStatic)

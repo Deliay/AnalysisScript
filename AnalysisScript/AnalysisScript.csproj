@@ -6,8 +6,8 @@
     <Nullable>enable</Nullable>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/Deliay/AnalysisScript/</RepositoryUrl>
-    <Description>A super mini script for log analysis</Description>
-    <Version>1.0.2-beta.3</Version>
+    <Description>A super mini script for data processing</Description>
+    <Version>1.0.2-beta.4</Version>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 

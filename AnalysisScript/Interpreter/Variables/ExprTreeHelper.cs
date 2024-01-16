@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
+using AnalysisScript.Library;
 
 namespace AnalysisScript.Interpreter.Variables;
 
@@ -80,6 +81,33 @@ public static class ExprTreeHelper
     {
         return GetContainerValueLambda(IContainer.Of(value));
     }
+    public static MethodCallExpression GetConstantValueLambda(IContainer value)
+    {
+        return GetContainerValueLambda(value);
+    }
+
+    private static readonly Dictionary<Type, MethodInfo> BoxExprMethods = [];
+
+    private static readonly MethodInfo RawBoxMethod = ToDelegate(IContainer.Of<int>)
+        .Method.GetGenericMethodDefinition();
+    private static MethodInfo GetBoxExprToContainerMethod(Type type)
+    {
+        if (BoxExprMethods.TryGetValue(type, out var method)) return method;
+        
+        BoxExprMethods.Add(type, method = RawBoxMethod.MakeGenericMethod(type));
+
+        return method;
+    }
+    public static IContainer GetConstantValueLambda(Type type, IEnumerable<MethodCallExpression> container)
+    {
+        var array = Expression.NewArrayInit(type, container);
+        var arrayType = array.Type;
+        
+        var method = GetBoxExprToContainerMethod(arrayType);
+        var boxCall = Expression.Call(method, array);
+        var idCall = Expression.Call(MakeIdentity(typeof(IContainer), false), boxCall);
+        return Expression.Lambda<Func<IContainer>>(idCall).Compile()();
+    }
 
     public static Delegate GetIdentityLambda(Type type) {
         var parameter = Expression.Parameter(type);
@@ -87,19 +115,25 @@ public static class ExprTreeHelper
         return Expression.Lambda(parameter, parameter).Compile();
     }
 
-    public static T Identity<T>(Container<T> instance) => instance.Value;
+    public static T ContainerIdentity<T>(Container<T> instance) => instance.Value;
+    public static T Identity<T>(T instance) => instance;
     
-    private static readonly Dictionary<Type, MethodInfo> IdentityMethods = [];
+    private static readonly Dictionary<Type, MethodInfo> ContainerIdentityMethods = [];
+    private static readonly MethodInfo ContainerIdentityMethod = ToDelegate(ContainerIdentity<int>)
+        .Method.GetGenericMethodDefinition();
     private static readonly MethodInfo IdentityMethod = ToDelegate(Identity<int>)
         .Method.GetGenericMethodDefinition();
 
-    private static MethodInfo MakeIdentity(Type type)
+    private static MethodInfo MakeIdentity(Type type, bool containerized = true)
     {
-        if (!IdentityMethods.TryGetValue(type, out var method))
-        {
-            IdentityMethods.Add(type, method = IdentityMethod.MakeGenericMethod(type));
-        }
+        if (ContainerIdentityMethods.TryGetValue(type, out var method)) return method;
 
+        method = containerized
+            ? ContainerIdentityMethod.MakeGenericMethod(type)
+            : IdentityMethod.MakeGenericMethod(type);
+        
+        ContainerIdentityMethods.Add(type, method);
+        
         return method;
     }
 
@@ -157,12 +191,15 @@ public static class ExprTreeHelper
     }
 
     private static readonly Dictionary<(Type, Type), Delegate> _UnderlyingCastCache = [];
-    public static Func<T> ValueCastTo<T>(IContainer container)
+    public static async ValueTask<Func<T>> ValueCastTo<T>(IContainer container)
     {
-        var (parameter, value) = UnderlyingValueExpr(container);
 
+        var sanitizedContainer = await SanitizeLambdaExpression(container);
+        
+        var (parameter, value) = UnderlyingValueExpr(sanitizedContainer);
+        
         if (!value.Type.IsAssignableTo(typeof(T)))
-            throw new InvalidCastException();
+            throw new InvalidCastException($"{value.Type} can't cast to {typeof(T)}");
 
         if (!_UnderlyingCastCache.TryGetValue((value.Type, typeof(T)), out var rawConverter))
         {
@@ -182,7 +219,7 @@ public static class ExprTreeHelper
             }
         }
         var method = (Func<IContainer, T>)rawConverter;
-        return () => method(container);
+        return () => method(sanitizedContainer);
     }
 
 
@@ -193,7 +230,7 @@ public static class ExprTreeHelper
 
         return Expression.Lambda<Func<IContainer>>(expr).Compile()();
     }
-
+    
     public static async ValueTask<IContainer> SanitizeLambdaExpression(IContainer value)
     {
         if (value.UnderlyingType == typeof(LambdaExpression)) {

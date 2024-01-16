@@ -36,6 +36,21 @@ public static class Token
 
         public readonly Identity ToIdentity() => new("&", Pos, Line);
     }
+    public record struct ArrayStart(int Pos, int Line) : IToken
+    {
+        public readonly TokenType Type => TokenType.ArrayStart;
+        public bool IsConstant { get; set; }
+    }
+    public record struct ArrayEnd(int Pos, int Line) : IToken
+    {
+        public readonly TokenType Type => TokenType.ArrayEnd;
+        public bool IsConstant { get; set; }
+    }
+    public record struct Comma(int Pos, int Line) : IToken
+    {
+        public readonly TokenType Type => TokenType.Comma;
+        public bool IsConstant { get; set; }
+    }
     public record struct Call(int Pos, int Line) : IToken
     {
         public readonly TokenType Type => TokenType.Call;

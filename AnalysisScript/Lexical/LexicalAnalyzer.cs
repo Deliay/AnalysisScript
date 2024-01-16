@@ -38,6 +38,9 @@ public static class LexicalAnalyzer
             {
                 yield return new Token.Equal(pos, line);
             }
+            else if (current == '[') yield return new Token.ArrayStart(pos, line);
+            else if (current == ',') yield return new Token.Comma(pos, line);
+            else if (current == ']') yield return new Token.ArrayEnd(pos, line);
             else if (current == '&')
             {
                 yield return new Token.Reference(pos, line);
@@ -75,9 +78,16 @@ public static class LexicalAnalyzer
             else if (IsIdentityStart(current))
             {
                 var val = $"{current}";
-                while (HasMore() && IsIdentity(Peek()))
+                while (HasMore())
                 {
-                    val += current;
+                    if (IsIdentity(Peek()))
+                    {
+                        val += current;
+                    }
+                    else
+                    {
+                        Back(); break;
+                    }
                 }
 
                 yield return val switch
@@ -88,7 +98,6 @@ public static class LexicalAnalyzer
                     "return" => new Token.Return(pos, line),
                     _ => new Token.Identity(val, pos, line)
                 };
-                if (current == '\n') yield return new Token.NewLine(pos, line);
             }
             else if (IsQuote(current))
             {

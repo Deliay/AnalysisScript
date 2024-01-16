@@ -2,9 +2,9 @@ using AnalysisScript.Interpreter.Variables;
 
 namespace AnalysisScript.Test.Interpreter;
 
-public class IContainerTest
+public class ContainerTest
 {
-    private class Dummy {}
+    private class Dummy;
 
     [Fact]
     public void WillWrapVariableInContainerAndResolveUseAsMethod()
@@ -14,8 +14,8 @@ public class IContainerTest
         Assert.Equal(obj, container.As<Dummy>());
         Assert.Equal(typeof(Dummy), container.UnderlyingType);
     }
-    
-    private class DummySub : Dummy {}
+
+    private class DummySub : Dummy;
     private class DummySub2 : DummySub
     {
         public bool IsToStringCalled { get; private set; }
@@ -29,24 +29,24 @@ public class IContainerTest
         public const string ToStringResult = "1";
     }
     [Fact]
-    public void WillCastUnderlyingValueUseValueCastToMethod()
+    public async Task WillCastUnderlyingValueUseValueCastToMethod()
     {
         var obj = new DummySub();
         var container = IContainer.Of(obj);
         Assert.Throws<InvalidCastException>(() => Assert.Equal(obj, container.As<Dummy>()));
-        Assert.Equal(obj, container.ValueCastTo<Dummy>());
-        Assert.Equal(obj, container.ValueCastTo<Dummy>());
+        Assert.Equal(obj, await container.ValueCastTo<Dummy>());
+        Assert.Equal(obj, await container.ValueCastTo<Dummy>());
     }
     
     [Fact]
-    public void WillCastUnderlyingValueUseRightClass()
+    public async Task WillCastUnderlyingValueUseRightClass()
     {
         var obj = new DummySub2();
         var container = IContainer.Of(obj);
         Assert.Throws<InvalidCastException>(() => Assert.Equal(obj, container.As<Dummy>()));
         Assert.Throws<InvalidCastException>(() => Assert.Equal(obj, container.As<DummySub>()));
-        Assert.Equal(obj, container.ValueCastTo<Dummy>());
-        Assert.Equal(obj, container.ValueCastTo<DummySub>());
+        Assert.Equal(obj, await container.ValueCastTo<Dummy>());
+        Assert.Equal(obj, await container.ValueCastTo<DummySub>());
     }
     
     [Fact]
