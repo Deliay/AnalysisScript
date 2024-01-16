@@ -1,5 +1,5 @@
 # Analysis Script
-A super mini script for log analysis
+A super mini script for data processing
 
 ## Examples
 
