@@ -283,4 +283,104 @@ public class InterpreterTest
             _ = await interpreter.RunAndReturn<int>(token: default);
         });
     }
+
+    [Fact]
+    public async Task CanReturnArray()
+    {
+        var interpreter = AsInterpreter.Of($@"
+let a = [1,2,3]
+return a
+");
+        var ret = await interpreter.RunAndReturn<IEnumerable<int>>(token: default);
+        
+        Assert.Equal(6, ret.Sum());
+    }
+    [Fact]
+    public async Task CanDereferenceAndReturnArray()
+    {
+        var variables = new VariableContext();
+        variables.Methods.RegisterStaticFunction("id", Id<int[]>);
+        
+        var interpreter = AsInterpreter.Of(variables, $@"
+let a = 1
+let b = 2
+let c = 3
+|| id [a, b, &]
+return c
+");
+        var ret = await interpreter.RunAndReturn<IEnumerable<int>>(token: default);
+        
+        Assert.Equal(6, ret.Sum());
+        
+        return;
+
+        T Id<T> (AsExecutionContext ctx, T t) => t;
+    }
+    [Fact]
+    public async Task CanPassArrayToNextPipe()
+    {
+
+        var callTable = new { called = false };
+        var instanceSum = (AsExecutionContext ctx, IEnumerable<int> seq) =>
+        {
+            callTable = new { called = true };
+            return seq.Sum();
+        };
+        
+        var variables = new VariableContext();
+        variables.Methods.RegisterStaticFunction("id", Id<int[]>);
+        variables.Methods.RegisterStaticFunction("sum", Sum);
+        variables.Methods.RegisterInstanceFunction("sum2", instanceSum);
+        
+        var interpreter = AsInterpreter.Of(variables, $@"
+let a = 1
+let b = 2
+let c = 3
+|| id [a, b, &]
+| sum
+|| sum2 [&, 1]
+return c
+");
+        var ret = await interpreter.RunAndReturn<int>(token: default);
+        
+        Assert.Equal(7, ret);
+        Assert.True(callTable.called);
+        
+        return;
+
+        T Id<T> (AsExecutionContext ctx, T t) => t;
+        int Sum(AsExecutionContext ctx, IEnumerable<int> seq) => seq.Sum();
+    }
+    [Fact]
+    public async Task ThrowIfArrayTypeMismatch()
+    {
+        var ex = await Assert.ThrowsAsync<AsRuntimeException>(async () =>
+        {
+            var interpreter = AsInterpreter.Of($@"
+let a = [1,2,3,""1""]
+return a
+");
+            _ = await interpreter.RunAndReturn<IEnumerable<int>>(token: default);
+        });
+
+        Assert.IsType<InvalidArrayType>(ex.InnerException);
+    }
+    [Fact]
+    public async Task ThrowIfReferenceTypeMismatch()
+    {
+        var ex = await Assert.ThrowsAsync<AsRuntimeException>(async () =>
+        {
+            var variables = new VariableContext();
+            variables.Methods.RegisterStaticFunction("id", Id<int[]>);
+            var interpreter = AsInterpreter.Of($@"
+let a = ""1""
+|| id [1,2,&]
+return a
+");
+            _ = await interpreter.RunAndReturn<IEnumerable<int>>(token: default);
+        });
+
+        Assert.IsType<InvalidArrayType>(ex.InnerException);
+        T Id<T> (AsExecutionContext ctx, T t) => t;
+    }
 }

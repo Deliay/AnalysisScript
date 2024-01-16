@@ -95,11 +95,42 @@ public class VariableContext(MethodContext methods)
             AsString str => AddTempVar(IContainer.Of(Interpolation(str)), str.LexicalToken),
             AsInteger integer => AddTempVar(IContainer.Of(integer.Value), integer.LexicalToken),
             AsNumber num => AddTempVar(IContainer.Of(num.Real), num.LexicalToken),
+            AsArray arr => AddTempVar(BuildArray(arr), arr.LexicalToken),
             AsIdentity id => id,
             _ => throw new UnknownValueObjectException(@object)
         };
     }
 
+    private IContainer BuildArray(AsArray array)
+    {
+        Type? basicType = null;
+        var exprList = Enumerator().ToList();
+        
+        return ExprTreeHelper.GetConstantValueLambda(basicType, exprList);
+
+        IEnumerable<MethodCallExpression> Enumerator()
+        {
+            foreach (var item in array.Items)
+            {
+                var container = LambdaValueOf(item);
+                
+                if (basicType is null)
+                {
+                    basicType = container.Method.ReturnType;
+                }
+                else
+                {
+                    if (container.Method.ReturnType != basicType)
+                    {
+                        throw new InvalidArrayType(array.LexicalToken, basicType, container.Method.ReturnType);
+                    }
+                }
+
+                yield return container;
+            }
+        }
+    }
+    
     public MethodCallExpression LambdaValueOf(AsObject @object)
     {
         return @object switch
@@ -107,6 +138,7 @@ public class VariableContext(MethodContext methods)
             AsString str => ExprTreeHelper.GetConstantValueLambda(Interpolation(str)),
             AsInteger integer => ExprTreeHelper.GetConstantValueLambda(integer.Value),
             AsNumber num => ExprTreeHelper.GetConstantValueLambda(num.Real),
+            AsArray arr => ExprTreeHelper.GetConstantValueLambda(BuildArray(arr)),
             AsIdentity id => ExprTreeHelper.GetContainerValueLambda(GetVariableContainer(id)),
             _ => throw new UnknownValueObjectException(@object)
         };

@@ -8,7 +8,7 @@ public interface IContainer
 
     public T? As<T>() => ((Container<T>)this).Value;
 
-    public T ValueCastTo<T>() => ExprTreeHelper.ValueCastTo<T>(this)();
+    public async ValueTask<T> ValueCastTo<T>() => (await ExprTreeHelper.ValueCastTo<T>(this))();
 
     public string? UnderlyingToString() => ExprTreeHelper.ExprToString(this);
 

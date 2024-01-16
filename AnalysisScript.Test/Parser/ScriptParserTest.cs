@@ -473,23 +473,18 @@ let {varName} = [a, b, c]
     }
 
     [Fact]
-    public void CanParseEmptyArray()
+    public void ThrowIfParseEmptyArray()
     {
-        var varName = "a";
-        var tokens = LexicalAnalyzer.Analyze(@$"
-let {varName} = []
+        Assert.Throws<InvalidGrammarException>(() =>
+        {
+            var varName = "a";
+            var tokens = LexicalAnalyzer.Analyze(@$"
+let a = []
 | a []
 
 ");
-        var ast = ScriptParser.Parse(tokens)!;
-
-        var let = ast.Commands.Cast<AsLet>().First();
-        Assert.Equal(varName, let.Name.Name);
-
-        let.Arg.IsArray([]);
-
-
-        Assert.Single(Assert.Single(let.Pipes).Arguments).IsArray([]);
+            _ = ScriptParser.Parse(tokens);
+        });
     }
 
     [Fact]

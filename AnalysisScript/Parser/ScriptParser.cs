@@ -117,6 +117,8 @@ public static class ScriptParser
     {
         var current = reader.Current;
         var array = ReadArrayObjects(reader, allowReference).ToList();
+
+        if (array.Count == 0) throw new InvalidGrammarException(current, allowReference ? ArgumentTypes : ArgumentTypesWithoutReference);
         return new AsArray((Token.ArrayStart)current, array);
     }
 
