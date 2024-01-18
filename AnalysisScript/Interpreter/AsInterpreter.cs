@@ -76,11 +76,11 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
         }
     }
 
-    private async ValueTask<List<IContainer>> InnerExecutePipe(
+    private IEnumerable<IContainer> InnerExecutePipe(
         AsExecutionContext ctx, AsPipe pipe, IEnumerable<IContainer> previousValues)
     {
         var executor = InnerExecutePipe(ctx, pipe, previousValues, ctx.CancelToken);
-        var all = await executor.ToListAsync();
+        var all = executor.ToEnumerable();
 
         return all;
     }
@@ -94,7 +94,7 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
         var previousValue = pipe.DontSpreadArg ? null : underlying;
         var method = Variables.BuildMethod(previousValue, pipe.FunctionName.Name, pipe.Arguments, () => underlying);
 
-        var iterated = await InnerExecutePipe(ctx, pipe, values);
+        var iterated = InnerExecutePipe(ctx, pipe, values);
 
         var value = ExprTreeHelper.ConvertContainerSequenceAsContainerizedUnknownSequence(method.ReturnType, iterated);
         

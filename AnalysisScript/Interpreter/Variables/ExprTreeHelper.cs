@@ -258,35 +258,19 @@ public static class ExprTreeHelper
     private static readonly Dictionary<Type, Func<IEnumerable<IContainer>, IContainer>> ContainerSequenceUnwrapMethod = [];
     private static readonly Dictionary<Type, Func<IContainer>> EmptySequenceMethods =  [];
     private static readonly MethodInfo EmptySeqMethod = ToDelegate(Enumerable.Empty<int>).Method.GetGenericMethodDefinition();
-    public static IContainer ConvertContainerSequenceAsContainerizedUnknownSequence(Type rawUnderlying, List<IContainer> values)
+    public static IContainer ConvertContainerSequenceAsContainerizedUnknownSequence(Type rawUnderlying, IEnumerable<IContainer> values)
     {
         var underlying = IsStable(typeof(Task<>), rawUnderlying) || IsStable(typeof(ValueTask<>), rawUnderlying)
             ? rawUnderlying.GetGenericArguments()[0]
             : rawUnderlying;
-        if (values.Count == 0)
-        {
-            if (!EmptySequenceMethods.TryGetValue(underlying, out var emptyLambda))
-            {
-                var emptyMethod = EmptySeqMethod.MakeGenericMethod(underlying);
-                var callEmptySeq = Expression.Call(null, emptyMethod);
-                var wrapContainer = GetBoxExprToContainerMethod(emptyMethod.ReturnType);
-                var callWrap = Expression.Call(null, wrapContainer, callEmptySeq);
-                emptyLambda = Expression.Lambda<Func<IContainer>>(callWrap).Compile();
-                
-                EmptySequenceMethods.Add(underlying, emptyLambda);
-            }
-
-            return emptyLambda();
-        }
         
         if (!ContainerSequenceUnwrapMethod.TryGetValue(underlying, out var method))
         {
-            var containerType = values[0].GetType();
             
             // param: Container<T>
             var param = ContainerParameter;
             // getter: Container<T>.Value.get
-            var getter = GetValueContainerValueGetter(containerType);
+            var getter = GetValueContainerValueGetter(GetContainerType(underlying));
 
             // Func<IContainer, T> = getter(caster(param)) 
             var containerGetter = Expression.Lambda(getter, param);
