@@ -29,24 +29,24 @@ public class ContainerTest
         public const string ToStringResult = "1";
     }
     [Fact]
-    public async Task WillCastUnderlyingValueUseValueCastToMethod()
+    public void WillCastUnderlyingValueUseValueCastToMethod()
     {
         var obj = new DummySub();
         var container = IContainer.Of(obj);
         Assert.Throws<InvalidCastException>(() => Assert.Equal(obj, container.As<Dummy>()));
-        Assert.Equal(obj, await container.ValueCastTo<Dummy>());
-        Assert.Equal(obj, await container.ValueCastTo<Dummy>());
+        Assert.Equal(obj, container.ValueCastTo<Dummy>());
+        Assert.Equal(obj, container.ValueCastTo<Dummy>());
     }
     
     [Fact]
-    public async Task WillCastUnderlyingValueUseRightClass()
+    public void WillCastUnderlyingValueUseRightClass()
     {
         var obj = new DummySub2();
         var container = IContainer.Of(obj);
         Assert.Throws<InvalidCastException>(() => Assert.Equal(obj, container.As<Dummy>()));
         Assert.Throws<InvalidCastException>(() => Assert.Equal(obj, container.As<DummySub>()));
-        Assert.Equal(obj, await container.ValueCastTo<Dummy>());
-        Assert.Equal(obj, await container.ValueCastTo<DummySub>());
+        Assert.Equal(obj, container.ValueCastTo<Dummy>());
+        Assert.Equal(obj, container.ValueCastTo<DummySub>());
     }
     
     [Fact]

@@ -181,7 +181,13 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
     public async ValueTask<T?> RunAndReturn<T>(AsExecutionContext ctx)
     {
         await Run(ctx);
-        return Return is not null ? await Return.ValueCastTo<T>() : default;
+        return Return is not null ? await Return.ValueCastToAsync<T>() : default;
+    }
+
+    public async ValueTask<T?> RunAndReturnAsync<T>(AsExecutionContext ctx)
+    {
+        await Run(ctx);
+        return Return is not null ? await Return.ValueCastToAsync<T>() : default;
     }
 
     private async ValueTask RunCommand(AsExecutionContext ctx, AsCommand cmd)
