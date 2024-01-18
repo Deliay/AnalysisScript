@@ -357,12 +357,10 @@ public static class ExprTreeHelper
 
     private static readonly Dictionary<(Type, Type), Delegate> UnderlyingCastCache = [];
     
-    public static async ValueTask<Func<T>> GetValueCastToDelegate<T>(IContainer container)
+    public static Func<T> GetValueCastToDelegate<T>(IContainer container)
     {
 
-        var sanitizedContainer = await SanitizeLambdaExpression(container);
-        
-        var (parameter, value) = GetUnderlyingValueExpr(sanitizedContainer);
+        var (parameter, value) = GetUnderlyingValueExpr(container);
         
         if (!value.Type.IsAssignableTo(typeof(T)))
             throw new InvalidCastException($"{value.Type} can't cast to {typeof(T)}");
@@ -385,7 +383,14 @@ public static class ExprTreeHelper
             }
         }
         var method = (Func<IContainer, T>)rawConverter;
-        return () => method(sanitizedContainer);
+        return () => method(container);
+    }
+    
+    public static async ValueTask<Func<T>> GetValueCastToDelegateAsync<T>(IContainer container)
+    {
+        var sanitizedContainer = await SanitizeLambdaExpression(container);
+
+        return GetValueCastToDelegate<T>(sanitizedContainer);
     }
 
     public static async ValueTask<IContainer> SanitizeLambdaExpression(IContainer value)
