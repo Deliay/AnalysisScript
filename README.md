@@ -49,7 +49,7 @@ let res = "${firstArray}|${sum}"
 return res
 """);
 var result = await interpreter.RunAndReturn<string>();
-
+****
 // Output: 0,2|13
 Console.WriteLine(result);
 ```
@@ -63,10 +63,15 @@ let b = arg1
 | fn arg2 arg3
 | fn2 arg2
 | fn3
-# block arg1 pass to current pipe function
+
+# Use '||' to block the current value passed to the first arg of the next pipe function
 # symbol '&' reference to return value of 'fn3'
 || fn4 & arg2 arg3
 || fn5 [&, arg2, arg3]
+
+# symbol '*' can execute pipes that use 'for each' element from privious
+# will throw exception if privious can't cast to 'IEnumerabe<T>'
+||* fn6 arg1 & arg3
 
 call fn6 arg1 arg2 arg3
 
