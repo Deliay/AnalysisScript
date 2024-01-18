@@ -383,4 +383,6 @@ return a
         Assert.IsType<InvalidArrayType>(ex.InnerException);
         T Id<T> (AsExecutionContext ctx, T t) => t;
     }
+    [Fact]
+    public async Task Can
 }

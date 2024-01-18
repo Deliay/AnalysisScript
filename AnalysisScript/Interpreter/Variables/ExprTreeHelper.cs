@@ -44,8 +44,12 @@ public static class ExprTreeHelper
         {
             return $"{string.Join(',', container.Take(3))}...Total {container.Count()} item(s)";
         }
+
     }
     private static readonly Dictionary<Type, MethodInfo> EnumerableToStringMethods = [];
+
+    private const string CollectionToStringName =
+        nameof(InternEnumerableToStringHelper<List<int>, int>.CollectionToString);
     private static MethodInfo GetEnumerableToStringMethod(Type underlying)
     {
         if (EnumerableToStringMethods.TryGetValue(underlying, out var method)) return method;
@@ -54,7 +58,7 @@ public static class ExprTreeHelper
             .MakeGenericType(
                 underlying,
                 underlying.GenericTypeArguments[0]);
-        EnumerableToStringMethods.Add(underlying, method = type.GetMethod("CollectionToString")!);
+        EnumerableToStringMethods.Add(underlying, method = type.GetMethod(CollectionToStringName)!);
 
         return method;
     }
@@ -63,7 +67,7 @@ public static class ExprTreeHelper
     {
         if (TypeToString.TryGetValue(underlying, out var method)) return method;
         
-        if (underlying.GetMethod("ToString", []) is { } typeToString && typeToString.DeclaringType?.GUID == underlying.GUID)
+        if (underlying.GetMethod("ToString", []) is { } typeToString && IsStable(underlying, typeToString.DeclaringType))
         {
             TypeToString.Add(underlying, method = typeToString);
         }
@@ -208,7 +212,7 @@ public static class ExprTreeHelper
         if (!UnknownSequenceToContainerSequenceMethod.TryGetValue(seqOriginalType, out var method))
         {
             var sequenceType = seqOriginalType.GetInterfaces()
-                                   .FirstOrDefault(type => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                                   .FirstOrDefault(type => IsGenericStable(typeof(IEnumerable<>), type))
                                ?? throw new InvalidCastException();
         
             var underlyingType = sequenceType.GetGenericArguments().FirstOrDefault()
@@ -380,20 +384,33 @@ public static class ExprTreeHelper
         return parameters.Select(getter => getter.Method.ReturnType).ToList();
     }
 
+    private static bool IsGenericStable(Type target, Type? source)
+    {
+        if (source is null) return false;
+        
+        return source.IsGenericType
+               && target.GetGenericTypeDefinition() == source.GetGenericTypeDefinition();
+    }
+    
+    private static bool IsStable(Type target, Type? source)
+    {
+        if (source is null) return false;
+        
+        if (target.IsGenericType)
+        {
+            return source.IsGenericType
+                   && target.GetGenericTypeDefinition() == source.GetGenericTypeDefinition();
+        }
+
+        return target == source;
+    }
+    
     private static Type? FindStableType(Type target, Type source)
     {
-        if (source.GUID == target.GUID) return source;
+        if (IsStable(target, source)) return source;
 
         var interfaces = source.GetInterfaces();
-        foreach (var candidate in interfaces)
-        {
-            if (candidate.GUID == target.GUID) return candidate;
-                
-            var childStableType = FindStableType(target, candidate);
-
-            if (childStableType is not null) return childStableType;
-        }
-        return null;
+        return interfaces.FirstOrDefault(candidate => IsStable(candidate, target));
     }
 
     private static IEnumerable<(Type, Type)> ExtractTypeMapping(Type generic, Type parameter)
@@ -454,7 +471,7 @@ public static class ExprTreeHelper
         return true;
     }
 
-    private static bool MatchSignature(List<Type> from, List<Type> to)
+    private static bool MatchSignature(IReadOnlyList<Type> from, IReadOnlyList<Type> to)
     {
         if (from.Count != to.Count) return false;
 
@@ -500,19 +517,23 @@ public static class ExprTreeHelper
     {
         if (TypeToCastMethod.TryGetValue(underlying, out var method)) return method;
 
-        if (underlying.GUID == typeof(ValueTask<>).GUID)
+        switch (underlying.IsGenericType)
         {
-            var currentTaskResultType = underlying.GenericTypeArguments[0];
-            TypeToCastMethod.Add(underlying, method = AsyncValueTaskCastMethod.MakeGenericMethod(currentTaskResultType));
-        }
-        else if (underlying.GUID == typeof(Task<>).GUID)
-        {
-            var currentTaskResultType = underlying.GenericTypeArguments[0];
-            TypeToCastMethod.Add(underlying, method = AsyncTaskCastMethod.MakeGenericMethod(currentTaskResultType));
-        }
-        else
-        {
-            TypeToCastMethod.Add(underlying, method = ValueTaskCastMethod.MakeGenericMethod(underlying));
+            case true when underlying.GetGenericTypeDefinition() == typeof(ValueTask<>):
+            {
+                var currentTaskResultType = underlying.GenericTypeArguments[0];
+                TypeToCastMethod.Add(underlying, method = AsyncValueTaskCastMethod.MakeGenericMethod(currentTaskResultType));
+                break;
+            }
+            case true when underlying.GetGenericTypeDefinition() == typeof(Task<>):
+            {
+                var currentTaskResultType = underlying.GenericTypeArguments[0];
+                TypeToCastMethod.Add(underlying, method = AsyncTaskCastMethod.MakeGenericMethod(currentTaskResultType));
+                break;
+            }
+            default:
+                TypeToCastMethod.Add(underlying, method = ValueTaskCastMethod.MakeGenericMethod(underlying));
+                break;
         }
 
         return method;
