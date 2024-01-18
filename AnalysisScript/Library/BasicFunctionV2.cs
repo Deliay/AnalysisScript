@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using AnalysisScript.Interpreter.Variables;
+using AnalysisScript.Parser.Ast.Basic;
 
 namespace AnalysisScript.Library;
 
@@ -30,23 +31,6 @@ public static class BasicFunctionV2
         return Expression.Lambda(property);
     }
 
-    private static readonly MethodInfo SelectMethod = typeof(BasicFunctionV2).GetMethod("SelectWrapper")
-                                                      ?? throw new InvalidProgramException("Can't find Select(IEnumerable<>, Func<,>) method from Enumerable class");
-
-    private static readonly Dictionary<(Type, Type), MethodInfo> ConstructedSelectMethod = [];
-
-    private static MethodInfo ConstructSelectMethod(Type from, Type to)
-    {
-        if (!ConstructedSelectMethod.TryGetValue((from, to), out var method))
-        {
-            ConstructedSelectMethod.Add((from, to), method = SelectMethod.MakeGenericMethod(from ,to));
-        }
-
-        return method;
-    }
-    
-    public static IEnumerable<R> SelectWrapper<T, R>(IEnumerable<T> source, Func<T, R> mapper) => source.Select(mapper);
-
     [AsMethod(Name = "select")]
     public static LambdaExpression SelectSequence<T>(AsExecutionContext ctx, IEnumerable<T> @this, string propertyName)
     {
@@ -56,7 +40,7 @@ public static class BasicFunctionV2
         var thisParam = ExprTreeHelper.GetConstantValueLambda(@this);
 
         var mapperMethod = Expression.Lambda(property, param);
-        var selectMethod = ConstructSelectMethod(typeof(T), property.Type);
+        var selectMethod = ExprTreeHelper.ConstructSelectMethod(typeof(T), property.Type);
 
         var callSelect = Expression.Call(null, selectMethod, thisParam, mapperMethod);
 
@@ -82,7 +66,7 @@ public static class BasicFunctionV2
         var param = Expression.Parameter(typeof(T), "item");
         var propertyGetter = Expression.Property(param, propertyName);
 
-        var valueGetter = ExprTreeHelper.ExprToString<T>(param, propertyGetter);
+        var valueGetter = ExprTreeHelper.GetExprToStringDelegate<T>(param, propertyGetter);
 
         return values.Where((item) => valueGetter(item).Contains(contains));
     }
@@ -93,7 +77,7 @@ public static class BasicFunctionV2
             var param = Expression.Parameter(typeof(T), "item");
             var propertyGetter = Expression.Property(param, propertyName);
 
-            var valueGetter = ExprTreeHelper.ExprToString<T>(param, propertyGetter);
+            var valueGetter = ExprTreeHelper.GetExprToStringDelegate<T>(param, propertyGetter);
 
             var regex = GetRegex(regexStr);
 
@@ -114,7 +98,7 @@ public static class BasicFunctionV2
             var param = Expression.Parameter(typeof(T), "item");
             var propertyGetter = Expression.Property(param, propertyName);
 
-            var valueGetter = ExprTreeHelper.ExprToString<T>(param, propertyGetter);
+            var valueGetter = ExprTreeHelper.GetExprToStringDelegate<T>(param, propertyGetter);
 
             return values.Where((item) => !valueGetter(item).Contains(contains));
         }
@@ -125,7 +109,7 @@ public static class BasicFunctionV2
             var param = Expression.Parameter(typeof(T), "item");
             var propertyGetter = Expression.Property(param, propertyName);
 
-            var valueGetter = ExprTreeHelper.ExprToString<T>(param, propertyGetter);
+            var valueGetter = ExprTreeHelper.GetExprToStringDelegate<T>(param, propertyGetter);
 
             var regex = GetRegex(regexStr);
 

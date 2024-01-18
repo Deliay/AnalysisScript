@@ -245,4 +245,19 @@ public class MethodContextTest
             ctx.RegisterInstanceFunction("foo", foo);
         });
     }
+
+    [Fact]
+    public void TestInterfaceMatching()
+    {
+        var guidEqualResultList = typeof(List<int>).GetInterfaces()
+            .Where(item => item.GUID == typeof(IEnumerable<>).GUID)
+            .ToList();
+
+        var typeEqualResultList = typeof(List<int>).GetInterfaces()
+            .Where(item => item.IsGenericType && item.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+            .ToList();
+        
+        Assert.Equal(guidEqualResultList.Count, typeEqualResultList.Count);
+        Assert.Equal(Assert.Single(guidEqualResultList), Assert.Single(typeEqualResultList));
+    }
 }

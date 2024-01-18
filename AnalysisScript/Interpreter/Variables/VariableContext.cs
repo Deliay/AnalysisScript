@@ -155,7 +155,8 @@ public class VariableContext(MethodContext methods)
         }
     }
 
-    public Expression<Func<ValueTask<IContainer>>> GetMethodCallLambda(MethodCallExpression? @this, string name, IEnumerable<AsObject> methodParams, AsExecutionContext ctx)
+    public Expression<Func<ValueTask<IContainer>>> GetMethodCallLambda(
+        MethodCallExpression? @this, string name, IEnumerable<AsObject> methodParams, AsExecutionContext ctx)
     {
         var exprValues = Args(methodParams, @this, ctx);
         var exprList = exprValues.ToList();
@@ -168,7 +169,8 @@ public class VariableContext(MethodContext methods)
         return Expression.Lambda<Func<ValueTask<IContainer>>>(methodExpr);
     }
 
-    public Expression<Func<ValueTask<IContainer>>> GetMethodCallLambda(string name, IEnumerable<AsObject> methodParams, AsExecutionContext ctx)
+    public Expression<Func<ValueTask<IContainer>>> GetMethodCallLambda(
+        string name, IEnumerable<AsObject> methodParams, AsExecutionContext ctx)
     {
         return GetMethodCallLambda(null!, name, methodParams, ctx);
     }

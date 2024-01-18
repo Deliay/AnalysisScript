@@ -1,9 +1,11 @@
+using System.Linq.Expressions;
 using AnalysisScript.Interpreter.Variables;
 using AnalysisScript.Parser.Ast;
 using AnalysisScript.Parser.Ast.Basic;
 using AnalysisScript.Parser.Ast.Command;
 using AnalysisScript.Parser.Ast.Operator;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using AnalysisScript.Lexical;
 using AnalysisScript.Parser;
 
@@ -13,14 +15,8 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
 {
     public VariableContext Variables { get; } = variableContext;
     public IContainer? Return { get; private set; }
-    
-    [Obsolete("Property removed since 1.0.3")]
-    public string LastComment { get; private set; } = "";
     public string CurrentCommand { get; private set; } = "";
     public AsAnalysis? Tree { get; set; } = tree;
-
-    [Obsolete("Event removed since 1.0.3")]
-    public event Action<string>? OnCommentUpdate;
 
     public event Action<string>? OnCommandUpdate;
 
@@ -43,6 +39,73 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
         OnLogging?.Invoke(message);
     }
 
+    private async ValueTask<(AsIdentity, MethodCallExpression)> RunNormalPipe(
+        AsExecutionContext ctx, AsPipe pipe, MethodCallExpression previousWrappedValue)
+    {
+        var firstArg = pipe.DontSpreadArg ? null : previousWrappedValue;
+        var pipeValueGetter = Variables.GetMethodCallLambda(firstArg, pipe.FunctionName.Name, pipe.Arguments, ctx).Compile();
+
+        var nextValue = await pipeValueGetter();
+        var sanitizedValue = await ExprTreeHelper.SanitizeLambdaExpression(nextValue);
+
+        Variables.AddOrUpdateVariable(AsIdentity.Reference, sanitizedValue);
+        var nextValueId = Variables.AddTempVar(sanitizedValue, pipe.LexicalToken);
+        var wrappedValue = Variables.LambdaValueOf(nextValueId);
+
+        return (nextValueId, wrappedValue);
+    }
+
+    private async IAsyncEnumerable<IContainer> InnerExecutePipe(
+        AsExecutionContext ctx, AsPipe pipe, IEnumerable<IContainer> previousValues,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        foreach (var value in previousValues)
+        {
+            var valueLambda = ExprTreeHelper.GetConstantValueLambda(value);
+            Variables.AddOrUpdateVariable(AsIdentity.Reference, value);
+            
+            var firstArg = pipe.DontSpreadArg ? null : valueLambda;
+            var pipeValueGetter = Variables.GetMethodCallLambda(firstArg, pipe.FunctionName.Name, pipe.Arguments, ctx).Compile();
+            
+            var currentValue = await pipeValueGetter();
+            var sanitizedValue = await ExprTreeHelper.SanitizeLambdaExpression(currentValue);
+
+            yield return sanitizedValue;
+        }
+    }
+
+    private async ValueTask<IEnumerable<IContainer>> InnerExecutePipe(
+        AsExecutionContext ctx, AsPipe pipe, IEnumerable<IContainer> previousValues)
+    {
+        var executor = InnerExecutePipe(ctx, pipe, previousValues, ctx.CancelToken);
+        var all = await executor.ToListAsync();
+
+        return all;
+    }
+    
+    private async ValueTask<(AsIdentity, MethodCallExpression)> RunForEachPipe(
+        AsExecutionContext ctx, AsPipe pipe, MethodCallExpression previous)
+    {
+        var (underlying, values) = ExprTreeHelper.ConvertUnknownSequenceAsContainerizedSequence(previous);
+        var iterated = await InnerExecutePipe(ctx, pipe, values);
+
+        var value = ExprTreeHelper.ConvertContainerSequenceAsContainerizedUnknownSequence(underlying, iterated);
+        
+        Variables.AddOrUpdateVariable(AsIdentity.Reference, value);
+        var nextValueId = Variables.AddTempVar(value, pipe.LexicalToken);
+        var wrappedValue = Variables.LambdaValueOf(nextValueId);
+
+        return (nextValueId, wrappedValue);
+    }
+
+    private ValueTask<(AsIdentity, MethodCallExpression)> RunPipe(
+        AsExecutionContext ctx, AsPipe pipe, MethodCallExpression previous)
+    {
+        return pipe.ForEach
+            ? RunForEachPipe(ctx, pipe, previous)
+            : RunNormalPipe(ctx, pipe, previous);
+    }
+    
     private async ValueTask<AsIdentity> RunPipe(AsExecutionContext ctx, List<AsPipe> pipes, AsObject initialValue)
     {
         var initialValueId = Variables.Storage(initialValue);
@@ -57,15 +120,7 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
         foreach (var pipe in pipes)
         {
             ctx.CurrentExecuteObject = pipe;
-
-            var firstArg = pipe.DontSpreadArg ? null : value;
-            var pipeValueGetter = Variables.GetMethodCallLambda(firstArg, pipe.FunctionName.Name, pipe.Arguments, ctx).Compile();
-
-            var nextValue = await pipeValueGetter();
-            var sanitizedValue = await ExprTreeHelper.SanitizeLambdaExpression(nextValue);
-
-            Variables.AddOrUpdateVariable(AsIdentity.Reference, sanitizedValue);
-            value = Variables.LambdaValueOf(lastValueId = Variables.AddTempVar(sanitizedValue, pipe.LexicalToken));
+            (lastValueId, value) = await RunPipe(ctx, pipe, value);
         }
 
         return lastValueId;
@@ -114,7 +169,7 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
 
     public AsInterpreter AddVariable<T>(string name, T value)
     {
-        Variables.PutInitVariable(new AsIdentity(new Lexical.Token.Identity(name, 0, 0)), value);
+        Variables.PutInitVariable(new AsIdentity(new Token.Identity(name, 0, 0)), value);
         return this;
     }
     
@@ -180,7 +235,6 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
     public void Dispose()
     {
         OnCommandUpdate = null;
-        OnCommentUpdate = null;
         OnLogging = null;
     }
 
