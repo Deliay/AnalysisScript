@@ -134,6 +134,11 @@ public class MethodContext
 
     private MethodCallExpression BuildMethod(string name, string singedName, IEnumerable<MethodCallExpression> parameters)
     {
+        return BuildMethod(name, singedName, parameters.Select(param => param.Method.ReturnType));
+    }
+    
+    private MethodCallExpression BuildMethod(string name, string singedName, IEnumerable<Type> parameters)
+    {
         if (!this._rawMethod.TryGetValue(name, out var rawMethods))
             throw new UnknownMethodException(name, singedName);
 
@@ -150,12 +155,20 @@ public class MethodContext
 
     public MethodCallExpression GetMethod(MethodCallExpression? @this, string name, IEnumerable<MethodCallExpression> paramGetters)
     {
-        string[] prefix = (@this is null) switch {
+        return GetMethod(@this, name, paramGetters.Select(param => param.Method.ReturnType));
+    }
+    public MethodCallExpression GetMethod(MethodCallExpression? @this, string name, IEnumerable<Type> paramGetters)
+    {
+        return GetMethod(@this?.Method.ReturnType, name, paramGetters);
+    }
+    public MethodCallExpression GetMethod(Type? thisType, string name, IEnumerable<Type> paramGetters)
+    {
+        string[] prefix = (thisType is null) switch {
             true => [name],
-            _ => [name, ExprTreeHelper.GetTypeParamString(@this.Method.ReturnType)]
+            _ => [name, ExprTreeHelper.GetTypeParamString(thisType)]
         };
         var parameterList = paramGetters.ToList();
-        var paramStrings = prefix.Concat(parameterList.Select(getter => ExprTreeHelper.GetTypeParamString(getter.Method.ReturnType)));
+        var paramStrings = prefix.Concat(parameterList.Select(ExprTreeHelper.GetTypeParamString));
         var paramSign = ExprTreeHelper.JoinTypeParams(paramStrings);
 
         if (!_methods.TryGetValue(paramSign, out var method))

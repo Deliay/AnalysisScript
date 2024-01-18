@@ -1,6 +1,7 @@
 using AnalysisScript.Interpreter;
 using AnalysisScript.Interpreter.Variables;
 using AnalysisScript.Interpreter.Variables.Method;
+using AnalysisScript.Library;
 
 namespace AnalysisScript.Test.Interpreter;
 
@@ -429,5 +430,34 @@ return a
         Task<int> IncAsync(AsExecutionContext ctx, int val) => Task.FromResult(val + 1);
 
         int Inc(AsExecutionContext ctx, int val) => val + 1;
+    }
+
+    [Fact]
+    public async Task ShouldMatchGenericMethodRecursively()
+    {
+        var variables = new VariableContext();
+        variables.Methods.ScanAndRegisterStaticFunction(typeof(BasicFunctionV2));
+        variables.AddInitializeVariable<IEnumerable<string>>("a", ["1", "2"]);
+
+        var interpreter = AsInterpreter.Of(variables, $@"
+param a
+
+let b = a
+| take 3
+||* format ""1-2-${{&}}-3-4""  
+||* format ""${{&}}-formatted""
+||* split & ""-""
+| flat
+| join "",""
+
+return b
+");
+        var ret = await interpreter.RunAndReturn<string>(token: default);
+        
+        Assert.Equal("1,2,1,3,4,formatted,1,2,2,3,4,formatted", ret);
+        
+        return;
+
+        List<string> Split(string delim, string str) => str.Split(delim).ToList();
     }
 }

@@ -171,6 +171,11 @@ public static class BasicFunctionV2
         return ctx.VariableContext.Interpolation(format, ctx.CurrentExecuteObject!.LexicalToken);
     }
 
+    [AsMethod(Name = "flat")]
+    public static IEnumerable<T> Flat<T>(AsExecutionContext ctx, IEnumerable<IEnumerable<T>> arrayList)
+    {
+        return arrayList.SelectMany(array => array);
+    }
     public static AsInterpreter RegisterBasicFunctionsV2(this AsInterpreter interpreter)
     {
         interpreter.Variables.Methods.ScanAndRegisterStaticFunction(typeof(BasicFunctionV2));

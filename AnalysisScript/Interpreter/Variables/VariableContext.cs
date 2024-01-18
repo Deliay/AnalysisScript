@@ -2,6 +2,7 @@
 using AnalysisScript.Lexical;
 using AnalysisScript.Parser.Ast.Basic;
 using System.Linq.Expressions;
+using System.Reflection;
 
 namespace AnalysisScript.Interpreter.Variables;
 
@@ -101,12 +102,16 @@ public class VariableContext(MethodContext methods)
         };
     }
 
+    private Type PeekArrayType(AsArray array, Func<Type>? referenceType = default)
+    {
+        return array.Items.Select(item => TypeOf(item, referenceType)).FirstOrDefault() ?? throw new InvalidDataException();
+    }
     private IContainer BuildArray(AsArray array)
     {
         Type? basicType = null;
         var exprList = Enumerator().ToList();
         
-        return ExprTreeHelper.GetConstantValueLambda(basicType, exprList);
+        return ExprTreeHelper.GetConstantValueLambda(basicType!, exprList);
 
         IEnumerable<MethodCallExpression> Enumerator()
         {
@@ -131,6 +136,20 @@ public class VariableContext(MethodContext methods)
         }
     }
     
+    public Type TypeOf(AsObject @object, Func<Type>? referenceType = default)
+    {
+        return @object switch
+        {
+            AsString => typeof(string),
+            AsInteger integer => typeof(int),
+            AsNumber num => typeof(double),
+            AsArray arr => PeekArrayType(arr, referenceType),
+            AsIdentity id => referenceType is not null && id.Name == "&"
+                ? referenceType()
+                : GetVariableContainer(id).UnderlyingType,
+            _ => throw new UnknownValueObjectException(@object)
+        };
+    }
     public MethodCallExpression LambdaValueOf(AsObject @object)
     {
         return @object switch
@@ -153,6 +172,22 @@ public class VariableContext(MethodContext methods)
             var expr = LambdaValueOf(item);
             yield return expr;
         }
+    }
+
+    private IEnumerable<Type> ArgTypes(IEnumerable<AsObject> arguments, Type? thisType, Func<Type>? referenceType = default)
+    {
+        yield return typeof(AsExecutionContext);
+        if (thisType is not null) yield return thisType;
+        foreach (var arg in arguments)
+        {
+            yield return TypeOf(arg, referenceType);
+        }
+    }
+
+    public MethodInfo BuildMethod(
+        Type? thisType, string name, IEnumerable<AsObject> methodParams, Func<Type>? referenceType = default)
+    {
+        return Methods.GetMethod(thisType, name, ArgTypes(methodParams, thisType, referenceType)).Method;
     }
 
     public Expression<Func<ValueTask<IContainer>>> GetMethodCallLambda(

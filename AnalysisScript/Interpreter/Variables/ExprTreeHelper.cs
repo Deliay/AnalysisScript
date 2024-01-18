@@ -206,13 +206,6 @@ public static class ExprTreeHelper
         return method(self);
     }
 
-    private static MethodCallExpression GetContainerValueLambda(ParameterExpression param)
-    {
-        var id = MakeIdentity(param.Type);
-        var invoke = Expression.Call(id, param);
-
-        return invoke;
-    }
     public static MethodCallExpression GetContainerValueLambda(IContainer container)
     {
         var constant = Expression.Constant(container);
@@ -265,8 +258,11 @@ public static class ExprTreeHelper
     private static readonly Dictionary<Type, Func<IEnumerable<IContainer>, IContainer>> ContainerSequenceUnwrapMethod = [];
     private static readonly Dictionary<Type, Func<IContainer>> EmptySequenceMethods =  [];
     private static readonly MethodInfo EmptySeqMethod = ToDelegate(Enumerable.Empty<int>).Method.GetGenericMethodDefinition();
-    public static IContainer ConvertContainerSequenceAsContainerizedUnknownSequence(Type underlying, List<IContainer> values)
+    public static IContainer ConvertContainerSequenceAsContainerizedUnknownSequence(Type rawUnderlying, List<IContainer> values)
     {
+        var underlying = IsStable(typeof(Task<>), rawUnderlying) || IsStable(typeof(ValueTask<>), rawUnderlying)
+            ? rawUnderlying.GetGenericArguments()[0]
+            : rawUnderlying;
         if (values.Count == 0)
         {
             if (!EmptySequenceMethods.TryGetValue(underlying, out var emptyLambda))
@@ -430,13 +426,12 @@ public static class ExprTreeHelper
 
     public static string GetSignatureOf(IEnumerable<MethodCallExpression> parameters)
     {
-        var methodSignatures = parameters.Select(getter => GetTypeParamString(getter.Method.ReturnType));
-        return JoinTypeParams(methodSignatures);
+        return GetSignatureOf(parameters.Select(param => param.Method.ReturnType));
     }
-
-    private static List<Type> GetSignatureTypesOf(IEnumerable<MethodCallExpression> parameters)
+    public static string GetSignatureOf(IEnumerable<Type> parameters)
     {
-        return parameters.Select(getter => getter.Method.ReturnType).ToList();
+        var methodSignatures = parameters.Select(GetTypeParamString);
+        return JoinTypeParams(methodSignatures);
     }
 
     private static bool IsGenericStable(Type target, Type? source)
@@ -476,19 +471,34 @@ public static class ExprTreeHelper
                 
         var genericTypes = generic.GetGenericArguments();
         var parameterizedTypes = genericImplType.GetGenericArguments();
-
+        
         for (var i = 0; i < genericTypes.Length; i++)
         {
-            yield return (genericTypes[i], parameterizedTypes[i]);
+            var genericType = genericTypes[i];
+            var parameterizedType = parameterizedTypes[i];
+
+            if (genericType.IsGenericType)
+            {
+                var innerParameterizedType = FindStableType(genericType, parameterizedType);
+                if (innerParameterizedType is not null)
+                {
+                    foreach (var innerMatchResult in ExtractTypeMapping(genericType, innerParameterizedType))
+                    {
+                        yield return innerMatchResult;
+                    }
+                }
+            }
+            
+            yield return (genericType, parameterizedType);
         }
     }
 
-    private static bool TryBuildGenericMethod(MethodInfo genericMethod, IEnumerable<MethodCallExpression> parameterGetters, [NotNullWhen(true)]out MethodInfo? method)
+    private static bool TryBuildGenericMethod(MethodInfo genericMethod, IEnumerable<Type> parameterGetters, [NotNullWhen(true)]out MethodInfo? method)
     {
         var genericTypes = genericMethod.GetGenericArguments();
         var methodParameters = genericMethod.GetParameters();
 
-        var orderedParameter = parameterGetters.Select(getter => getter.Method.ReturnType).ToArray();
+        var orderedParameter = parameterGetters.ToArray();
 
         method = null!;
 
@@ -543,8 +553,12 @@ public static class ExprTreeHelper
 
     public static (MethodCallExpression, string) BuildMethod(List<(MethodInfo, ConstantExpression?)> methods, IEnumerable<MethodCallExpression> parameters)
     {
+        return BuildMethod(methods, parameters.Select(param => param.Method.ReturnType));
+
+    }
+    public static (MethodCallExpression, string) BuildMethod(List<(MethodInfo, ConstantExpression?)> methods, IEnumerable<Type> parameters)
+    {
         var parameterArray = parameters.ToList();
-        var signature = GetSignatureTypesOf(parameterArray);
         methods.Sort((a, _) => a.Item1.IsGenericMethodDefinition ? 1 : -1);
         foreach (var (method, instance) in methods)
         {
@@ -556,13 +570,13 @@ public static class ExprTreeHelper
 
             var methodParamSignatures = currentMethod.GetParameters().Select(param => param.ParameterType).ToList();
 
-            if (!MatchSignature(signature, methodParamSignatures)) continue;
+            if (!MatchSignature(parameterArray, methodParamSignatures)) continue;
             var methodParams = currentMethod.GetParameters().Select(param => Expression.Parameter(param.ParameterType, param.Name));
             var callExpr = Expression.Call(instance, currentMethod, methodParams);
 
             return (callExpr, GetSignatureOf(parameterArray));
         }
-        throw new MissingMethodException($"No method match argument signature {signature}");
+        throw new MissingMethodException($"No method match argument signature {parameterArray}");
 
     }
 

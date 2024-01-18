@@ -124,7 +124,7 @@ public class MethodContextTest
 
         ctx.ScanAndRegisterInstanceFunction(inst);
 
-        var methodExpr = ctx.GetMethod(null, InstanceRegistry.MethodBar, []);
+        var methodExpr = ctx.GetMethod(thisType: null, InstanceRegistry.MethodBar, Array.Empty<Type>());
         Assert.Equal(InstanceRegistry.ActualInstanceMethodBar, methodExpr.Method);
         var @this = Assert.IsType<ConstantExpression>(methodExpr.Object);
         Assert.Equal(inst, @this.Value);

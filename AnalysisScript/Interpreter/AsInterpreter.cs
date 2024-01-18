@@ -61,6 +61,8 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
     {
         foreach (var value in previousValues)
         {
+            if (cancellationToken.IsCancellationRequested) yield break;
+
             var valueLambda = ExprTreeHelper.GetConstantValueLambda(value);
             Variables.AddOrUpdateVariable(AsIdentity.Reference, value);
             
@@ -87,9 +89,14 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
         AsExecutionContext ctx, AsPipe pipe, MethodCallExpression previous)
     {
         var (underlying, values) = ExprTreeHelper.ConvertUnknownSequenceAsContainerizedSequence(previous);
+        
+        // preview method for build return value container
+        var previousValue = pipe.DontSpreadArg ? null : underlying;
+        var method = Variables.BuildMethod(previousValue, pipe.FunctionName.Name, pipe.Arguments, () => underlying);
+
         var iterated = await InnerExecutePipe(ctx, pipe, values);
 
-        var value = ExprTreeHelper.ConvertContainerSequenceAsContainerizedUnknownSequence(underlying, iterated);
+        var value = ExprTreeHelper.ConvertContainerSequenceAsContainerizedUnknownSequence(method.ReturnType, iterated);
         
         Variables.AddOrUpdateVariable(AsIdentity.Reference, value);
         var nextValueId = Variables.AddTempVar(value, pipe.LexicalToken);
@@ -227,7 +234,7 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
         try
         {
             ctx.VariableContext = Variables;
-            foreach (var cmd in Tree.Commands)
+            foreach (var cmd in Tree!.Commands)
             {
                 await RunCommand(ctx, cmd);
             }
