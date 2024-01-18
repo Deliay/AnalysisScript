@@ -7,8 +7,7 @@ namespace AnalysisScript.Interpreter.Variables;
 public static class ExprTreeHelper
 {
     private static readonly MethodInfo SelectMethod = ToDelegate(SelectWrapper<int, int>)
-        .Method.GetGenericMethodDefinition()
-        ?? throw new InvalidProgramException("Can't find Select(IEnumerable<>, Func<,>) method from Enumerable class");
+        .Method.GetGenericMethodDefinition();
 
     private static readonly Dictionary<(Type, Type), MethodInfo> ConstructedSelectMethod = [];
 
@@ -83,18 +82,31 @@ public static class ExprTreeHelper
     private static readonly ParameterExpression ContainerParameter = Expression.Parameter(typeof(IContainer), "container");
     private static readonly Dictionary<Type, UnaryExpression> UnderlyingCastExprCache = [];
     private static readonly Dictionary<Type, MemberExpression> UnderlyingPropertyCache = [];
+
+    private static UnaryExpression GetCastIContainerTypeExpression(Type containerType)
+    {
+        if (!UnderlyingCastExprCache.TryGetValue(containerType, out var castedContainer))
+        {
+            UnderlyingCastExprCache.Add(containerType, castedContainer = Expression.Convert(ContainerParameter, containerType));
+        }
+
+        return castedContainer;
+    }
+
+    private static MemberExpression GetValueContainerValueGetter(Type containerType)
+    {
+        if (!UnderlyingPropertyCache.TryGetValue(containerType, out var valueProperty))
+        {
+            var castExpr = GetCastIContainerTypeExpression(containerType);
+            UnderlyingPropertyCache.Add(containerType, valueProperty = Expression.Property(castExpr, "Value"));
+        }
+
+        return valueProperty;
+    }
     private static (ParameterExpression, MemberExpression) GetUnderlyingValueExpr(IContainer container)
     {
         var type = container.GetType();
-        if (!UnderlyingCastExprCache.TryGetValue(type, out var castedContainer))
-        {
-            UnderlyingCastExprCache.Add(type, castedContainer = Expression.Convert(ContainerParameter, type));
-        }
-
-        if (!UnderlyingPropertyCache.TryGetValue(type, out var valueProperty))
-        {
-            UnderlyingPropertyCache.Add(type, valueProperty = Expression.Property(castedContainer, "Value"));
-        }
+        var valueProperty = GetValueContainerValueGetter(type);
 
         return (ContainerParameter, valueProperty);
     }
@@ -121,11 +133,15 @@ public static class ExprTreeHelper
         return method;
     }
 
+    private static MethodCallExpression GetBoxExprToContainerMethod(ParameterExpression lambdaParam)
+    {
+        return Expression.Call(null, GetBoxExprToContainerMethod(lambdaParam.Type), lambdaParam);
+    }
+
     private static LambdaExpression GetBoxExprToContainerLambda(Type type)
     {
         var param = Expression.Parameter(type);
-
-        return Expression.Lambda(Expression.Call(GetBoxExprToContainerMethod(type), param));
+        return Expression.Lambda(GetBoxExprToContainerMethod(param), param);
     }
     public static IContainer GetConstantValueLambda(Type type, IEnumerable<MethodCallExpression> container)
     {
@@ -142,6 +158,7 @@ public static class ExprTreeHelper
     private static T Identity<T>(T instance) => instance;
     
     private static readonly Dictionary<Type, MethodInfo> ContainerIdentityMethods = [];
+    private static readonly Dictionary<Type, MethodInfo> NonContainerIdentityMethods = [];
     private static readonly MethodInfo ContainerIdentityMethod = ToDelegate(ContainerIdentity<int>)
         .Method.GetGenericMethodDefinition();
     private static readonly MethodInfo IdentityMethod = ToDelegate(Identity<int>)
@@ -149,13 +166,15 @@ public static class ExprTreeHelper
 
     private static MethodInfo MakeIdentity(Type type, bool containerized = true)
     {
-        if (ContainerIdentityMethods.TryGetValue(type, out var method)) return method;
+        if (containerized && ContainerIdentityMethods.TryGetValue(type, out var method)) return method;
+        if (!containerized && NonContainerIdentityMethods.TryGetValue(type, out method)) return method;
 
         method = containerized
             ? ContainerIdentityMethod.MakeGenericMethod(type)
             : IdentityMethod.MakeGenericMethod(type);
         
-        ContainerIdentityMethods.Add(type, method);
+        if (containerized) ContainerIdentityMethods.Add(type, method);
+        else NonContainerIdentityMethods.Add(type, method);
         
         return method;
     }
@@ -187,10 +206,10 @@ public static class ExprTreeHelper
         return method(self);
     }
 
-    private static MethodCallExpression GetContainerValueLambda(Expression expr)
+    private static MethodCallExpression GetContainerValueLambda(ParameterExpression param)
     {
-        var id = MakeIdentity(expr.Type);
-        var invoke = Expression.Call(id, expr);
+        var id = MakeIdentity(param.Type);
+        var invoke = Expression.Call(id, param);
 
         return invoke;
     }
@@ -204,14 +223,14 @@ public static class ExprTreeHelper
         return invoke;
     }
 
-    private static readonly Dictionary<Type, MethodInfo> UnknownSequenceToContainerSequenceMethod = [];
+    private static readonly Dictionary<Type, LambdaExpression> UnknownSequenceToContainerSequenceMethod = [];
     private static readonly Dictionary<Type, Type> UnknownSequenceUnderlyingType = [];
     public static (Type, IEnumerable<IContainer>) ConvertUnknownSequenceAsContainerizedSequence(MethodCallExpression sequence)
     {
         var seqOriginalType = sequence.Method.ReturnType;
         if (!UnknownSequenceToContainerSequenceMethod.TryGetValue(seqOriginalType, out var method))
         {
-            var sequenceType = seqOriginalType.GetInterfaces()
+            var sequenceType = seqOriginalType.GetInterfaces().Append(seqOriginalType)
                                    .FirstOrDefault(type => IsGenericStable(typeof(IEnumerable<>), type))
                                ?? throw new InvalidCastException();
         
@@ -220,43 +239,74 @@ public static class ExprTreeHelper
 
             var param = Expression.Parameter(seqOriginalType);
             
-            // convert ? to IEnumerable<T>
-            var convertMethod = MakeIdentity(sequenceType);
-            var id = Expression.Call(convertMethod, param);
+            // lambda mapper: T => IContainer
+            var mapperMethod = GetBoxExprToContainerLambda(underlyingType).Compile();
+            var mapper = Expression.Constant(mapperMethod);
             
+            // convert ? to IEnumerable<T>
+            // var convertMethod = MakeIdentity(sequenceType, containerized: false);
+            // var id = Expression.Call(convertMethod, param);
             // box IEnumerable<T> to IEnumerable<IContainer>
-            var select = ConstructSelectMethod(seqOriginalType, sequenceType);
-            var mapper = GetBoxExprToContainerLambda(underlyingType);
-            var convert = Expression.Call(select, id, mapper);
+            var select = ConstructSelectMethod(underlyingType, typeof(IContainer));
+            
+            var convert = Expression.Call(null, select, param, mapper);
             
             // compile convert method
             UnknownSequenceUnderlyingType.Add(seqOriginalType, underlyingType);
-            UnknownSequenceToContainerSequenceMethod.Add(seqOriginalType, method = Expression.Lambda(convert, param).Compile().Method);
+            var lambda = Expression.Lambda(convert, param);
+            UnknownSequenceToContainerSequenceMethod.Add(seqOriginalType, method = lambda);
         }
 
-        var methodCall = Expression.Call(null, method, sequence);
+        var methodCall = Expression.Invoke(method, sequence);
         var func = Expression.Lambda<Func<IEnumerable<IContainer>>>(methodCall).Compile();
         return (UnknownSequenceUnderlyingType[seqOriginalType], func());
     }
 
     private static readonly Dictionary<Type, Func<IEnumerable<IContainer>, IContainer>> ContainerSequenceUnwrapMethod = [];
-    public static IContainer ConvertContainerSequenceAsContainerizedUnknownSequence(Type underlying, IEnumerable<IContainer> values)
+    private static readonly Dictionary<Type, Func<IContainer>> EmptySequenceMethods =  [];
+    private static readonly MethodInfo EmptySeqMethod = ToDelegate(Enumerable.Empty<int>).Method.GetGenericMethodDefinition();
+    public static IContainer ConvertContainerSequenceAsContainerizedUnknownSequence(Type underlying, List<IContainer> values)
     {
+        if (values.Count == 0)
+        {
+            if (!EmptySequenceMethods.TryGetValue(underlying, out var emptyLambda))
+            {
+                var emptyMethod = EmptySeqMethod.MakeGenericMethod(underlying);
+                var callEmptySeq = Expression.Call(null, emptyMethod);
+                var wrapContainer = GetBoxExprToContainerMethod(emptyMethod.ReturnType);
+                var callWrap = Expression.Call(null, wrapContainer, callEmptySeq);
+                emptyLambda = Expression.Lambda<Func<IContainer>>(callWrap).Compile();
+                
+                EmptySequenceMethods.Add(underlying, emptyLambda);
+            }
+
+            return emptyLambda();
+        }
+        
         if (!ContainerSequenceUnwrapMethod.TryGetValue(underlying, out var method))
         {
-            // IEnumerable<IContainer> => IEnumerable<underlying>
-            var param = Expression.Parameter(typeof(IContainer));
-            var select = ConstructSelectMethod(typeof(IContainer), underlying);
-            var mapper = GetContainerValueLambda(param);
-            var unwrap = Expression.Call(select, param, mapper);
-
-            // IEnumerable<underlying> => IContainer
-            var wrapContainer = GetBoxExprToContainerMethod(unwrap.Method.ReturnType);
-
-            var wrap = Expression.Call(null!, wrapContainer, unwrap);
+            var containerType = values[0].GetType();
             
-            var func = Expression.Lambda<Func<IEnumerable<IContainer>, IContainer>>(wrap, param);
-            ContainerSequenceUnwrapMethod.Add(underlying, method = func.Compile());
+            // param: Container<T>
+            var param = ContainerParameter;
+            // getter: Container<T>.Value.get
+            var getter = GetValueContainerValueGetter(containerType);
+
+            // Func<IContainer, T> = getter(caster(param)) 
+            var containerGetter = Expression.Lambda(getter, param);
+            var containerGetterMethod = Expression.Constant(containerGetter.Compile());
+            
+            // IEnumerable<IContainer> => IEnumerable<underlying>
+            var seqParam = Expression.Parameter(typeof(IEnumerable<IContainer>));
+            var seqCaster = ConstructSelectMethod(typeof(IContainer), underlying);
+            var callCast = Expression.Call(null, seqCaster, seqParam, containerGetterMethod);
+
+            var box = GetBoxExprToContainerLambda(callCast.Type);
+            var callBox = Expression.Invoke(box, callCast);
+
+            var callCastLambda = Expression.Lambda<Func<IEnumerable<IContainer>, IContainer>>(callBox, seqParam); 
+
+            ContainerSequenceUnwrapMethod.Add(underlying, method = callCastLambda.Compile());
         }
 
         return method(values);

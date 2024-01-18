@@ -74,7 +74,7 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
         }
     }
 
-    private async ValueTask<IEnumerable<IContainer>> InnerExecutePipe(
+    private async ValueTask<List<IContainer>> InnerExecutePipe(
         AsExecutionContext ctx, AsPipe pipe, IEnumerable<IContainer> previousValues)
     {
         var executor = InnerExecutePipe(ctx, pipe, previousValues, ctx.CancelToken);
