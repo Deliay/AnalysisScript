@@ -164,7 +164,7 @@ public class InterpreterTest
     [Fact]
     public async Task CanReferenceLastResultInPipe()
     {
-        var paramA = 1;
+        const int paramA = 1;
         var incr = (AsExecutionContext ctx, int a, int b) => a + b;
 
 
@@ -193,7 +193,7 @@ public class InterpreterTest
     [Fact]
     public async Task CanReferenceLastResultInPipeAndInterpolation()
     {
-        var paramA = 1;
+        const int paramA = 1;
         var incr = (AsExecutionContext ctx, int a, int b, IEnumerable<int> seq) => seq.Select(c => c + a + b);
         var sum = (AsExecutionContext ctx, IEnumerable<int> seq) => seq.Sum();
 
@@ -224,7 +224,7 @@ public class InterpreterTest
     [Fact]
     public async Task CanBlockArgumentSpread()
     {
-        var paramA = 1;
+        const int paramA = 1;
         var incr = (AsExecutionContext ctx, IEnumerable<int> seq, int a) => seq.Select(c => c + a);
         var sum = (AsExecutionContext ctx, IEnumerable<int> seq) => seq.Sum();
 
@@ -255,7 +255,7 @@ public class InterpreterTest
     [Fact]
     public async Task ThrowIfBlockArgumentSpreadMissingArgumentForMethod()
     {
-        var paramA = 1;
+        const int paramA = 1;
         var incr = (AsExecutionContext ctx, IEnumerable<int> seq, int a) => seq.Select(c => c + a);
         var sum = (AsExecutionContext ctx, IEnumerable<int> seq) => seq.Sum();
 
@@ -382,5 +382,52 @@ return a
 
         Assert.IsType<InvalidArrayType>(ex.InnerException);
         T Id<T> (AsExecutionContext ctx, T t) => t;
+    }
+
+    [Fact]
+    public async Task WillApplyEachItemInForeachSyntax()
+    {
+        
+        var interpreter = AsInterpreter.Of($@"
+let a = [1,2,3]
+|* inc
+
+return a
+");
+        interpreter.Variables.Methods.RegisterStaticFunction("inc", Inc);
+        var ret = await interpreter.RunAndReturn<IEnumerable<int>>(token: default);
+        
+        Assert.Equal(9, ret.Sum());
+
+        return;
+        int Inc(AsExecutionContext ctx, int val) => val + 1;
+    }
+    [Fact]
+    public async Task WillBlockPipeAndApplyEachItemInForeachSyntax()
+    {
+        var variables = new VariableContext();
+
+        variables.Methods.RegisterStaticFunction("inc", Inc);
+        variables.Methods.RegisterStaticFunction("inc", IncSeq);
+        variables.Methods.RegisterStaticFunction("inc_async", IncAsync);
+        var interpreter = AsInterpreter.Of(variables, $@"
+let a = [1,2,3]
+||* inc &
+|* inc_async
+| inc
+
+return a
+");
+        var ret = await interpreter.RunAndReturn<IEnumerable<int>>(token: default);
+        
+        Assert.Equal(15, ret.Sum());
+
+        return;
+
+        IEnumerable<int> IncSeq(AsExecutionContext ctx, IEnumerable<int> seq) => seq.Select(i => i + 1);
+
+        Task<int> IncAsync(AsExecutionContext ctx, int val) => Task.FromResult(val + 1);
+
+        int Inc(AsExecutionContext ctx, int val) => val + 1;
     }
 }

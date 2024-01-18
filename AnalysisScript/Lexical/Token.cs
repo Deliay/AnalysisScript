@@ -24,7 +24,7 @@ public static class Token
         public readonly TokenType Type => TokenType.Equal;
         public bool IsConstant { get; } = false;
     }
-    public record struct Pipe(int Pos, int Line, bool BlockSpread = false) : IToken
+    public record struct Pipe(int Pos, int Line, bool BlockSpread = false, bool ForEach = false) : IToken
     {
         public readonly TokenType Type => TokenType.Pipe;
         public bool IsConstant { get; } = false;
@@ -59,6 +59,11 @@ public static class Token
     public record struct Let(int Pos, int Line) : IToken
     {
         public readonly TokenType Type => TokenType.Let;
+        public bool IsConstant { get; } = false;
+    }
+    public record struct Star(int Pos, int Line) : IToken
+    {
+        public readonly TokenType Type => TokenType.Star;
         public bool IsConstant { get; } = false;
     }
     public record struct Param(int Pos, int Line) : IToken

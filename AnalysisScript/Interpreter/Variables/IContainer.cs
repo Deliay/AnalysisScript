@@ -8,11 +8,11 @@ public interface IContainer
 
     public T? As<T>() => ((Container<T>)this).Value;
 
-    public async ValueTask<T> ValueCastTo<T>() => (await ExprTreeHelper.ValueCastTo<T>(this))();
+    public async ValueTask<T> ValueCastTo<T>() => (await ExprTreeHelper.GetValueCastToDelegate<T>(this))();
 
-    public string? UnderlyingToString() => ExprTreeHelper.ExprToString(this);
+    public string? UnderlyingToString() => ExprTreeHelper.GetExprToStringDelegate(this);
 
-    public object? BoxedUnderlyingValue() => ExprTreeHelper.BoxUnderlyingValue(this)();
+    public object? BoxedUnderlyingValue() => ExprTreeHelper.GetBoxUnderlyingValueDelegate(this)();
 }
 
 public readonly struct Container<T>(T? value) : IContainer

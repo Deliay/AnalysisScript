@@ -1,12 +1,29 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
-using AnalysisScript.Library;
 
 namespace AnalysisScript.Interpreter.Variables;
 
 public static class ExprTreeHelper
 {
+    private static readonly MethodInfo SelectMethod = ToDelegate(SelectWrapper<int, int>)
+        .Method.GetGenericMethodDefinition();
+
+    private static readonly Dictionary<(Type, Type), MethodInfo> ConstructedSelectMethod = [];
+
+    public static MethodInfo ConstructSelectMethod(Type from, Type to)
+    {
+        if (!ConstructedSelectMethod.TryGetValue((from, to), out var method))
+        {
+            ConstructedSelectMethod.Add((from, to), method = SelectMethod.MakeGenericMethod(from ,to));
+        }
+
+        return method;
+    }
+    
+    private static IEnumerable<TOut> SelectWrapper<TIn, TOut>(IEnumerable<TIn> source, Func<TIn, TOut> mapper)
+        => source.Select(mapper);
+
     private static Delegate ToDelegate(Delegate @delegate) => @delegate;
     
     private static readonly Dictionary<Type, MethodInfo> TypeToString = [];
@@ -24,10 +41,14 @@ public static class ExprTreeHelper
     {
         public static string CollectionToString(TContainer container)
         {
-            return $"{string.Join(',', container.Take(3))}...共{container.Count()}项";
+            return $"{string.Join(',', container.Take(3))}...Total {container.Count()} item(s)";
         }
+
     }
     private static readonly Dictionary<Type, MethodInfo> EnumerableToStringMethods = [];
+
+    private const string CollectionToStringName =
+        nameof(InternEnumerableToStringHelper<List<int>, int>.CollectionToString);
     private static MethodInfo GetEnumerableToStringMethod(Type underlying)
     {
         if (EnumerableToStringMethods.TryGetValue(underlying, out var method)) return method;
@@ -36,22 +57,22 @@ public static class ExprTreeHelper
             .MakeGenericType(
                 underlying,
                 underlying.GenericTypeArguments[0]);
-        EnumerableToStringMethods.Add(underlying, method = type.GetMethod("CollectionToString")!);
+        EnumerableToStringMethods.Add(underlying, method = type.GetMethod(CollectionToStringName)!);
 
         return method;
     }
 
-    private static MethodInfo GetToStringMethod(Type underlying)
+    private static MethodInfo? GetToStringMethod(Type underlying)
     {
         if (TypeToString.TryGetValue(underlying, out var method)) return method;
         
-        if (underlying.GetMethod("ToString", []) is { } typeToString && typeToString.DeclaringType.GUID == underlying.GUID)
+        if (underlying.GetMethod("ToString", []) is { } typeToString && IsStable(underlying, typeToString.DeclaringType))
         {
             TypeToString.Add(underlying, method = typeToString);
         }
-        else if (FindStableType(typeof(IEnumerable<>), underlying) is { } stableIEnumerable)
+        else if (FindStableType(typeof(IEnumerable<>), underlying) is not null)
         {
-            return null!;
+            return null;
         }
         else 
             TypeToString.Add(underlying, method = typeof(object).GetMethod("ToString")!);
@@ -61,18 +82,31 @@ public static class ExprTreeHelper
     private static readonly ParameterExpression ContainerParameter = Expression.Parameter(typeof(IContainer), "container");
     private static readonly Dictionary<Type, UnaryExpression> UnderlyingCastExprCache = [];
     private static readonly Dictionary<Type, MemberExpression> UnderlyingPropertyCache = [];
-    private static (ParameterExpression, MemberExpression) UnderlyingValueExpr(IContainer container)
+
+    private static UnaryExpression GetCastIContainerTypeExpression(Type containerType)
     {
-        var type = container.GetType();
-        if (!UnderlyingCastExprCache.TryGetValue(type, out var castedContainer))
+        if (!UnderlyingCastExprCache.TryGetValue(containerType, out var castedContainer))
         {
-            UnderlyingCastExprCache.Add(type, castedContainer = Expression.Convert(ContainerParameter, type));
+            UnderlyingCastExprCache.Add(containerType, castedContainer = Expression.Convert(ContainerParameter, containerType));
         }
 
-        if (!UnderlyingPropertyCache.TryGetValue(type, out var valueProperty))
+        return castedContainer;
+    }
+
+    private static MemberExpression GetValueContainerValueGetter(Type containerType)
+    {
+        if (!UnderlyingPropertyCache.TryGetValue(containerType, out var valueProperty))
         {
-            UnderlyingPropertyCache.Add(type, valueProperty = Expression.Property(castedContainer, "Value"));
+            var castExpr = GetCastIContainerTypeExpression(containerType);
+            UnderlyingPropertyCache.Add(containerType, valueProperty = Expression.Property(castExpr, "Value"));
         }
+
+        return valueProperty;
+    }
+    private static (ParameterExpression, MemberExpression) GetUnderlyingValueExpr(IContainer container)
+    {
+        var type = container.GetType();
+        var valueProperty = GetValueContainerValueGetter(type);
 
         return (ContainerParameter, valueProperty);
     }
@@ -98,6 +132,17 @@ public static class ExprTreeHelper
 
         return method;
     }
+
+    private static MethodCallExpression GetBoxExprToContainerMethod(ParameterExpression lambdaParam)
+    {
+        return Expression.Call(null, GetBoxExprToContainerMethod(lambdaParam.Type), lambdaParam);
+    }
+
+    private static LambdaExpression GetBoxExprToContainerLambda(Type type)
+    {
+        var param = Expression.Parameter(type);
+        return Expression.Lambda(GetBoxExprToContainerMethod(param), param);
+    }
     public static IContainer GetConstantValueLambda(Type type, IEnumerable<MethodCallExpression> container)
     {
         var array = Expression.NewArrayInit(type, container);
@@ -109,16 +154,11 @@ public static class ExprTreeHelper
         return Expression.Lambda<Func<IContainer>>(idCall).Compile()();
     }
 
-    public static Delegate GetIdentityLambda(Type type) {
-        var parameter = Expression.Parameter(type);
-
-        return Expression.Lambda(parameter, parameter).Compile();
-    }
-
-    public static T ContainerIdentity<T>(Container<T> instance) => instance.Value;
-    public static T Identity<T>(T instance) => instance;
+    private static T ContainerIdentity<T>(Container<T> instance) => instance.Value!;
+    private static T Identity<T>(T instance) => instance;
     
     private static readonly Dictionary<Type, MethodInfo> ContainerIdentityMethods = [];
+    private static readonly Dictionary<Type, MethodInfo> NonContainerIdentityMethods = [];
     private static readonly MethodInfo ContainerIdentityMethod = ToDelegate(ContainerIdentity<int>)
         .Method.GetGenericMethodDefinition();
     private static readonly MethodInfo IdentityMethod = ToDelegate(Identity<int>)
@@ -126,17 +166,53 @@ public static class ExprTreeHelper
 
     private static MethodInfo MakeIdentity(Type type, bool containerized = true)
     {
-        if (ContainerIdentityMethods.TryGetValue(type, out var method)) return method;
+        if (containerized && ContainerIdentityMethods.TryGetValue(type, out var method)) return method;
+        if (!containerized && NonContainerIdentityMethods.TryGetValue(type, out method)) return method;
 
         method = containerized
             ? ContainerIdentityMethod.MakeGenericMethod(type)
             : IdentityMethod.MakeGenericMethod(type);
         
-        ContainerIdentityMethods.Add(type, method);
+        if (containerized) ContainerIdentityMethods.Add(type, method);
+        else NonContainerIdentityMethods.Add(type, method);
         
         return method;
     }
 
+    private static readonly Dictionary<(Type, Type), Func<IContainer, IContainer>>
+        CompiledConvertIContainerMethods = [];
+    
+    public static IContainer ConvertToInheritedTypeOfUnderlying(IContainer self, Type target)
+    {
+        if (CompiledConvertIContainerMethods.TryGetValue((self.UnderlyingType, target), out var method))
+        {
+            return method(self);
+        }
+        
+        var param = Expression.Parameter(typeof(IContainer));
+        
+        var containerUnbox = MakeIdentity(self.UnderlyingType);
+        var targetIdentity = MakeIdentity(target, containerized: false);
+
+        var castValue = Expression.Call(targetIdentity, Expression.Call(containerUnbox, param));
+
+        var boxMethod = GetBoxExprToContainerMethod(target);
+
+        var finalMethod = Expression.Call(boxMethod, castValue);
+        var compiled = Expression.Lambda<Func<IContainer, IContainer>>(finalMethod).Compile();
+        
+        CompiledConvertIContainerMethods.Add((self.UnderlyingType, target), method = compiled);
+        
+        return method(self);
+    }
+
+    private static MethodCallExpression GetContainerValueLambda(ParameterExpression param)
+    {
+        var id = MakeIdentity(param.Type);
+        var invoke = Expression.Call(id, param);
+
+        return invoke;
+    }
     public static MethodCallExpression GetContainerValueLambda(IContainer container)
     {
         var constant = Expression.Constant(container);
@@ -147,7 +223,96 @@ public static class ExprTreeHelper
         return invoke;
     }
 
-    public static Func<T, string> ExprToString<T>(ParameterExpression parameter, MemberExpression member)
+    private static readonly Dictionary<Type, LambdaExpression> UnknownSequenceToContainerSequenceMethod = [];
+    private static readonly Dictionary<Type, Type> UnknownSequenceUnderlyingType = [];
+    public static (Type, IEnumerable<IContainer>) ConvertUnknownSequenceAsContainerizedSequence(MethodCallExpression sequence)
+    {
+        var seqOriginalType = sequence.Method.ReturnType;
+        if (!UnknownSequenceToContainerSequenceMethod.TryGetValue(seqOriginalType, out var method))
+        {
+            var sequenceType = seqOriginalType.GetInterfaces().Append(seqOriginalType)
+                                   .FirstOrDefault(type => IsGenericStable(typeof(IEnumerable<>), type))
+                               ?? throw new InvalidCastException();
+        
+            var underlyingType = sequenceType.GetGenericArguments().FirstOrDefault()
+                                 ?? throw new InvalidProgramException();
+
+            var param = Expression.Parameter(seqOriginalType);
+            
+            // lambda mapper: T => IContainer
+            var mapperMethod = GetBoxExprToContainerLambda(underlyingType).Compile();
+            var mapper = Expression.Constant(mapperMethod);
+            
+            // convert ? to IEnumerable<T>
+            // var convertMethod = MakeIdentity(sequenceType, containerized: false);
+            // var id = Expression.Call(convertMethod, param);
+            // box IEnumerable<T> to IEnumerable<IContainer>
+            var select = ConstructSelectMethod(underlyingType, typeof(IContainer));
+            
+            var convert = Expression.Call(null, select, param, mapper);
+            
+            // compile convert method
+            UnknownSequenceUnderlyingType.Add(seqOriginalType, underlyingType);
+            var lambda = Expression.Lambda(convert, param);
+            UnknownSequenceToContainerSequenceMethod.Add(seqOriginalType, method = lambda);
+        }
+
+        var methodCall = Expression.Invoke(method, sequence);
+        var func = Expression.Lambda<Func<IEnumerable<IContainer>>>(methodCall).Compile();
+        return (UnknownSequenceUnderlyingType[seqOriginalType], func());
+    }
+
+    private static readonly Dictionary<Type, Func<IEnumerable<IContainer>, IContainer>> ContainerSequenceUnwrapMethod = [];
+    private static readonly Dictionary<Type, Func<IContainer>> EmptySequenceMethods =  [];
+    private static readonly MethodInfo EmptySeqMethod = ToDelegate(Enumerable.Empty<int>).Method.GetGenericMethodDefinition();
+    public static IContainer ConvertContainerSequenceAsContainerizedUnknownSequence(Type underlying, List<IContainer> values)
+    {
+        if (values.Count == 0)
+        {
+            if (!EmptySequenceMethods.TryGetValue(underlying, out var emptyLambda))
+            {
+                var emptyMethod = EmptySeqMethod.MakeGenericMethod(underlying);
+                var callEmptySeq = Expression.Call(null, emptyMethod);
+                var wrapContainer = GetBoxExprToContainerMethod(emptyMethod.ReturnType);
+                var callWrap = Expression.Call(null, wrapContainer, callEmptySeq);
+                emptyLambda = Expression.Lambda<Func<IContainer>>(callWrap).Compile();
+                
+                EmptySequenceMethods.Add(underlying, emptyLambda);
+            }
+
+            return emptyLambda();
+        }
+        
+        if (!ContainerSequenceUnwrapMethod.TryGetValue(underlying, out var method))
+        {
+            var containerType = values[0].GetType();
+            
+            // param: Container<T>
+            var param = ContainerParameter;
+            // getter: Container<T>.Value.get
+            var getter = GetValueContainerValueGetter(containerType);
+
+            // Func<IContainer, T> = getter(caster(param)) 
+            var containerGetter = Expression.Lambda(getter, param);
+            var containerGetterMethod = Expression.Constant(containerGetter.Compile());
+            
+            // IEnumerable<IContainer> => IEnumerable<underlying>
+            var seqParam = Expression.Parameter(typeof(IEnumerable<IContainer>));
+            var seqCaster = ConstructSelectMethod(typeof(IContainer), underlying);
+            var callCast = Expression.Call(null, seqCaster, seqParam, containerGetterMethod);
+
+            var box = GetBoxExprToContainerLambda(callCast.Type);
+            var callBox = Expression.Invoke(box, callCast);
+
+            var callCastLambda = Expression.Lambda<Func<IEnumerable<IContainer>, IContainer>>(callBox, seqParam); 
+
+            ContainerSequenceUnwrapMethod.Add(underlying, method = callCastLambda.Compile());
+        }
+
+        return method(values);
+    }
+    
+    public static Func<T, string> GetExprToStringDelegate<T>(ParameterExpression parameter, MemberExpression member)
     {
         var lambda = Expression.Lambda(member);
 
@@ -163,9 +328,9 @@ public static class ExprTreeHelper
         return toString.Compile();
     }
 
-    public static string? ExprToString(IContainer container)
+    public static string GetExprToStringDelegate(IContainer container)
     {
-        var (parameter, valueGetter) = UnderlyingValueExpr(container);
+        var (parameter, valueGetter) = GetUnderlyingValueExpr(container);
 
         var lambda = Expression.Lambda(valueGetter);
 
@@ -181,33 +346,34 @@ public static class ExprTreeHelper
         return toString.Compile()(container);
     }
 
-    public static Func<object?> BoxUnderlyingValue(IContainer container)
+    public static Func<object?> GetBoxUnderlyingValueDelegate(IContainer container)
     {
-        var (parameter, value) = UnderlyingValueExpr(container);
+        var (parameter, value) = GetUnderlyingValueExpr(container);
 
         var rawFunc = Expression.Lambda<Func<IContainer, object?>>(value, parameter).Compile();
 
         return () => rawFunc(container);
     }
 
-    private static readonly Dictionary<(Type, Type), Delegate> _UnderlyingCastCache = [];
-    public static async ValueTask<Func<T>> ValueCastTo<T>(IContainer container)
+    private static readonly Dictionary<(Type, Type), Delegate> UnderlyingCastCache = [];
+    
+    public static async ValueTask<Func<T>> GetValueCastToDelegate<T>(IContainer container)
     {
 
         var sanitizedContainer = await SanitizeLambdaExpression(container);
         
-        var (parameter, value) = UnderlyingValueExpr(sanitizedContainer);
+        var (parameter, value) = GetUnderlyingValueExpr(sanitizedContainer);
         
         if (!value.Type.IsAssignableTo(typeof(T)))
             throw new InvalidCastException($"{value.Type} can't cast to {typeof(T)}");
 
-        if (!_UnderlyingCastCache.TryGetValue((value.Type, typeof(T)), out var rawConverter))
+        if (!UnderlyingCastCache.TryGetValue((value.Type, typeof(T)), out var rawConverter))
         {
             if (value.Type.IsValueType)
             {
                 var valueTypeExpr = Expression.Lambda<Func<IContainer, T>>(value, parameter).Compile();
 
-                _UnderlyingCastCache.Add((value.Type, typeof(T)), rawConverter = valueTypeExpr);
+                UnderlyingCastCache.Add((value.Type, typeof(T)), rawConverter = valueTypeExpr);
             }
             else
             {
@@ -215,30 +381,19 @@ public static class ExprTreeHelper
 
                 var rawFunc = Expression.Lambda<Func<IContainer, T>>(cast, parameter).Compile();
 
-                _UnderlyingCastCache.Add((value.Type, typeof(T)), rawConverter = rawFunc);
+                UnderlyingCastCache.Add((value.Type, typeof(T)), rawConverter = rawFunc);
             }
         }
         var method = (Func<IContainer, T>)rawConverter;
         return () => method(sanitizedContainer);
     }
 
-
-    public static IContainer SanitizeIdentityMethodCallExpression(MethodCallExpression expr)
-    {
-        if (!(expr.Method == MakeIdentity(expr.Method.ReturnType)))
-            throw new InvalidCastException("Can't sanitize non Identity MethodCallExpression");
-
-        return Expression.Lambda<Func<IContainer>>(expr).Compile()();
-    }
-    
     public static async ValueTask<IContainer> SanitizeLambdaExpression(IContainer value)
     {
         if (value.UnderlyingType == typeof(LambdaExpression)) {
             var expr = value.As<LambdaExpression>()!;
             var invoke = Expression.Invoke(expr);
 
-            var retContainerType = GetContainerType(expr.ReturnType);
-            var retContainerTypeCtor = retContainerType.GetConstructors()[0];
             var wrappedValue = Expression.Call(GetTypeToCastMethod(expr.ReturnType), invoke);
                 
             var valueLambda = Expression.Lambda<Func<ValueTask<IContainer>>>(wrappedValue);
@@ -265,33 +420,47 @@ public static class ExprTreeHelper
         return Expression.Lambda<Func<object, IContainer>>(castToIContainer, parameter).Compile();
     }
 
-    public static string TypeParamString(Type type) => $"{type.FullName}";
+    public static string GetTypeParamString(Type type) => $"{type.FullName}";
     public static string JoinTypeParams(IEnumerable<string> paramStrings) => string.Join(',', paramStrings);
 
     public static string GetSignatureOf(IEnumerable<MethodCallExpression> parameters)
     {
-        var methodSignatures = parameters.Select(getter => TypeParamString(getter.Method.ReturnType));
+        var methodSignatures = parameters.Select(getter => GetTypeParamString(getter.Method.ReturnType));
         return JoinTypeParams(methodSignatures);
     }
-    public static List<Type> GetSignatureTypesOf(IEnumerable<MethodCallExpression> parameters)
+
+    private static List<Type> GetSignatureTypesOf(IEnumerable<MethodCallExpression> parameters)
     {
         return parameters.Select(getter => getter.Method.ReturnType).ToList();
     }
 
+    private static bool IsGenericStable(Type target, Type? source)
+    {
+        if (source is null) return false;
+        
+        return source.IsGenericType
+               && target.GetGenericTypeDefinition() == source.GetGenericTypeDefinition();
+    }
+    
+    private static bool IsStable(Type target, Type? source)
+    {
+        if (source is null) return false;
+        
+        if (target.IsGenericType)
+        {
+            return source.IsGenericType
+                   && target.GetGenericTypeDefinition() == source.GetGenericTypeDefinition();
+        }
+
+        return target == source;
+    }
+    
     private static Type? FindStableType(Type target, Type source)
     {
-        if (source.GUID == target.GUID) return source;
+        if (IsStable(target, source)) return source;
 
         var interfaces = source.GetInterfaces();
-        foreach (var candidate in interfaces)
-        {
-            if (candidate.GUID == target.GUID) return candidate;
-                
-            var childStableType = FindStableType(target, candidate);
-
-            if (childStableType is not null) return childStableType;
-        }
-        return null!;
+        return interfaces.FirstOrDefault(candidate => IsStable(candidate, target));
     }
 
     private static IEnumerable<(Type, Type)> ExtractTypeMapping(Type generic, Type parameter)
@@ -309,7 +478,7 @@ public static class ExprTreeHelper
         }
     }
 
-    public static bool TryBuildGenericMethod(MethodInfo genericMethod, IEnumerable<MethodCallExpression> parameterGetters, [NotNullWhen(true)]out MethodInfo? method)
+    private static bool TryBuildGenericMethod(MethodInfo genericMethod, IEnumerable<MethodCallExpression> parameterGetters, [NotNullWhen(true)]out MethodInfo? method)
     {
         var genericTypes = genericMethod.GetGenericArguments();
         var methodParameters = genericMethod.GetParameters();
@@ -352,7 +521,7 @@ public static class ExprTreeHelper
         return true;
     }
 
-    public static bool SignatureMatch(List<Type> from, List<Type> to)
+    private static bool MatchSignature(IReadOnlyList<Type> from, IReadOnlyList<Type> to)
     {
         if (from.Count != to.Count) return false;
 
@@ -371,7 +540,7 @@ public static class ExprTreeHelper
     {
         var parameterArray = parameters.ToList();
         var signature = GetSignatureTypesOf(parameterArray);
-        methods.Sort((a, b) => a.Item1.IsGenericMethodDefinition ? 1 : -1);
+        methods.Sort((a, _) => a.Item1.IsGenericMethodDefinition ? 1 : -1);
         foreach (var (method, instance) in methods)
         {
             var currentMethod = method;
@@ -382,7 +551,7 @@ public static class ExprTreeHelper
 
             var methodParamSignatures = currentMethod.GetParameters().Select(param => param.ParameterType).ToList();
 
-            if (!SignatureMatch(signature, methodParamSignatures)) continue;
+            if (!MatchSignature(signature, methodParamSignatures)) continue;
             var methodParams = currentMethod.GetParameters().Select(param => Expression.Parameter(param.ParameterType, param.Name));
             var callExpr = Expression.Call(instance, currentMethod, methodParams);
 
@@ -398,33 +567,40 @@ public static class ExprTreeHelper
     {
         if (TypeToCastMethod.TryGetValue(underlying, out var method)) return method;
 
-        if (underlying.GUID == typeof(ValueTask<>).GUID)
+        switch (underlying.IsGenericType)
         {
-            var currentTaskResultType = underlying.GenericTypeArguments[0];
-            TypeToCastMethod.Add(underlying, method = AsyncValueTaskCastMethod.MakeGenericMethod(currentTaskResultType)!);
-        }
-        else if (underlying.GUID == typeof(Task<>).GUID)
-        {
-            var currentTaskResultType = underlying.GenericTypeArguments[0];
-            TypeToCastMethod.Add(underlying, method = AsyncTaskCastMethod.MakeGenericMethod(currentTaskResultType)!);
-        }
-        else
-        {
-            TypeToCastMethod.Add(underlying, method = ValueTaskCastMethod.MakeGenericMethod(underlying)!);
+            case true when underlying.GetGenericTypeDefinition() == typeof(ValueTask<>):
+            {
+                var currentTaskResultType = underlying.GenericTypeArguments[0];
+                TypeToCastMethod.Add(underlying, method = AsyncValueTaskCastMethod.MakeGenericMethod(currentTaskResultType));
+                break;
+            }
+            case true when underlying.GetGenericTypeDefinition() == typeof(Task<>):
+            {
+                var currentTaskResultType = underlying.GenericTypeArguments[0];
+                TypeToCastMethod.Add(underlying, method = AsyncTaskCastMethod.MakeGenericMethod(currentTaskResultType));
+                break;
+            }
+            default:
+                TypeToCastMethod.Add(underlying, method = ValueTaskCastMethod.MakeGenericMethod(underlying));
+                break;
         }
 
         return method;
     }
-    public static ValueTask<IContainer> ValueTaskCast<T>(T old) => ValueTask.FromResult(IContainer.Of(old));
 
-    private static readonly MethodInfo ValueTaskCastMethod = ToDelegate(ValueTaskCast<int>)
+    private static ValueTask<IContainer> CastValueTask<T>(T old) => ValueTask.FromResult(IContainer.Of(old));
+
+    private static readonly MethodInfo ValueTaskCastMethod = ToDelegate(CastValueTask<int>)
         .Method.GetGenericMethodDefinition();
-    public static async ValueTask<IContainer> AsyncValueTaskCast<T>(ValueTask<T> old) => IContainer.Of(await old);
 
-    private static readonly MethodInfo AsyncValueTaskCastMethod = ToDelegate(AsyncValueTaskCast<int>)
+    private static async ValueTask<IContainer> CastAsyncValueTask<T>(ValueTask<T> old) => IContainer.Of(await old);
+
+    private static readonly MethodInfo AsyncValueTaskCastMethod = ToDelegate(CastAsyncValueTask<int>)
         .Method.GetGenericMethodDefinition();
-    public static async ValueTask<IContainer> AsyncTaskCast<T>(Task<T> old) => IContainer.Of(await old);
 
-    private static readonly MethodInfo AsyncTaskCastMethod = ToDelegate(AsyncTaskCast<int>)
+    private static async ValueTask<IContainer> CastAsyncTask<T>(Task<T> old) => IContainer.Of(await old);
+
+    private static readonly MethodInfo AsyncTaskCastMethod = ToDelegate(CastAsyncTask<int>)
         .Method.GetGenericMethodDefinition();
 }

@@ -75,6 +75,30 @@ public class LexicalAnalysisTest
         Assert.True(Assert.Single(tokens.Where(t => t.Type == TokenType.Pipe).Cast<Token.Pipe>()).BlockSpread);
     }
     [Fact]
+    public void CanResolveBlockForeachPipe()
+    {
+        var tokens = LexicalAnalyzer.Analyze("||        *  a        ").ToList();
+        Assert.Contains(tokens, token => token.Type == TokenType.Pipe);
+        Assert.Equal(3, tokens.Count);
+        var pipe = Assert.Single(tokens.Where(t => t.Type == TokenType.Pipe).Cast<Token.Pipe>());
+        Assert.True(pipe.BlockSpread);
+        Assert.True(pipe.ForEach);
+        var id = Assert.Single(tokens.Where(t => t.Type == TokenType.Identity).Cast<Token.Identity>());
+        Assert.Equal("a", id.Word);
+    }
+    [Fact]
+    public void CanResolveForeachPipe()
+    {
+        var tokens = LexicalAnalyzer.Analyze("|*a        ").ToList();
+        Assert.Contains(tokens, token => token.Type == TokenType.Pipe);
+        Assert.Equal(3, tokens.Count);
+        var pipe = Assert.Single(tokens.Where(t => t.Type == TokenType.Pipe).Cast<Token.Pipe>());
+        Assert.False(pipe.BlockSpread);
+        Assert.True(pipe.ForEach);
+        var id = Assert.Single(tokens.Where(t => t.Type == TokenType.Identity).Cast<Token.Identity>());
+        Assert.Equal("a", id.Word);
+    }
+    [Fact]
     public void CanResolveReference()
     {
         var tokens = LexicalAnalyzer.Analyze("&");
@@ -244,7 +268,7 @@ public class LexicalAnalysisTest
     [Fact]
     public void CanSkipSpace()
     {
-        var tokens = LexicalAnalyzer.Analyze("|            \"123\"\n#123\n123");
+        var tokens = LexicalAnalyzer.Analyze("|            \"123\"\n#123\n123").ToList();
         Assert.All(tokens, (token, i) =>
         {
             switch (i)

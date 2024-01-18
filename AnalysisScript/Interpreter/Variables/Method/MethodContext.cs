@@ -152,10 +152,10 @@ public class MethodContext
     {
         string[] prefix = (@this is null) switch {
             true => [name],
-            _ => [name, ExprTreeHelper.TypeParamString(@this.Method.ReturnType)]
+            _ => [name, ExprTreeHelper.GetTypeParamString(@this.Method.ReturnType)]
         };
         var parameterList = paramGetters.ToList();
-        var paramStrings = prefix.Concat(parameterList.Select(getter => ExprTreeHelper.TypeParamString(getter.Method.ReturnType)));
+        var paramStrings = prefix.Concat(parameterList.Select(getter => ExprTreeHelper.GetTypeParamString(getter.Method.ReturnType)));
         var paramSign = ExprTreeHelper.JoinTypeParams(paramStrings);
 
         if (!_methods.TryGetValue(paramSign, out var method))

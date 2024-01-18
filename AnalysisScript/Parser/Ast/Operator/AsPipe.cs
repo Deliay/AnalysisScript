@@ -8,6 +8,7 @@ public class AsPipe(Token.Pipe lexical, AsIdentity fn, List<AsObject> args) : As
     public AsIdentity FunctionName => fn;
     public List<AsObject> Arguments => args;
     public bool DontSpreadArg => LexicalToken.BlockSpread;
+    public bool ForEach => LexicalToken.ForEach;
 
     public override string ToString()
     {

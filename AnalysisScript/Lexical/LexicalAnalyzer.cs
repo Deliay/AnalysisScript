@@ -16,23 +16,36 @@ public static class LexicalAnalyzer
 
             if (current == '|')
             {
+                var p = pos;
+                var l = line;
+                var blockSpread = false;
+                var forEach = false;
                 if (HasMore())
                 {
                     Peek();
                     if (current == '|')
                     {
-                        yield return new Token.Pipe(pos, line, true);
+                        blockSpread = true;
                     }
                     else
                     {
                         Back();
-                        yield return new Token.Pipe(pos, line);
                     }
                 }
-                else
+
+                if (HasMore())
                 {
-                    yield return new Token.Pipe(pos, line);
+                    PeekAndSkipSpace();
+                    if (current == '*')
+                    {
+                        forEach = true;
+                    }
+                    else
+                    {
+                        Back();
+                    }
                 }
+                yield return new Token.Pipe(pos, line, blockSpread, forEach);
             }
             else if (current == '=')
             {
@@ -140,6 +153,15 @@ public static class LexicalAnalyzer
         yield break;
 
         char Peek() => current = source[pos++];
+        char PeekAndSkipSpace()
+        {
+            do
+            {
+                current = source[pos++];
+            } while (current == ' ');
+            
+            return current;
+        }
 
         void Back() => pos -= 1;
 
