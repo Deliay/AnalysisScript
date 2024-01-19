@@ -132,11 +132,6 @@ public class MethodContext
         return this;
     }
 
-    private MethodCallExpression BuildMethod(string name, string singedName, IEnumerable<MethodCallExpression> parameters)
-    {
-        return BuildMethod(name, singedName, parameters.Select(param => param.Method.ReturnType));
-    }
-    
     private MethodCallExpression BuildMethod(string name, string singedName, IEnumerable<Type> parameters)
     {
         if (!this._rawMethod.TryGetValue(name, out var rawMethods))
