@@ -396,9 +396,9 @@ let a = [1,2,3]
 return a
 ");
         interpreter.Variables.Methods.RegisterStaticFunction("inc", Inc);
-        var ret = await interpreter.RunAndReturn<IEnumerable<int>>(token: default);
+        var ret = await interpreter.RunAndReturn<IAsyncEnumerable<int>>(token: default);
         
-        Assert.Equal(9, ret.Sum());
+        Assert.Equal(9, await ret.SumAsync());
 
         return;
         int Inc(AsExecutionContext ctx, int val) => val + 1;
@@ -419,13 +419,13 @@ let a = [1,2,3]
 
 return a
 ");
-        var ret = await interpreter.RunAndReturn<IEnumerable<int>>(token: default);
+        var ret = await interpreter.RunAndReturn<IAsyncEnumerable<int>>(token: default);
         
-        Assert.Equal(15, ret.Sum());
+        Assert.Equal(15, await ret.SumAsync());
 
         return;
 
-        IEnumerable<int> IncSeq(AsExecutionContext ctx, IEnumerable<int> seq) => seq.Select(i => i + 1);
+        IAsyncEnumerable<int> IncSeq(AsExecutionContext ctx, IAsyncEnumerable<int> seq) => seq.Select(i => i + 1);
 
         Task<int> IncAsync(AsExecutionContext ctx, int val) => Task.FromResult(val + 1);
 
