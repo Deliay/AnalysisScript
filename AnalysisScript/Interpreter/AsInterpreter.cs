@@ -80,7 +80,7 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
         AsExecutionContext ctx, AsPipe pipe, IEnumerable<IContainer> previousValues)
     {
         var executor = InnerExecutePipe(ctx, pipe, previousValues, ctx.CancelToken);
-        var all = executor.ToEnumerable();
+        var all = executor.ToBlockingEnumerable();
 
         return all;
     }
