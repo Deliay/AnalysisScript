@@ -6,21 +6,67 @@ namespace AnalysisScript.Interpreter.Variables;
 
 public static class ExprTreeHelper
 {
-    private static readonly MethodInfo SelectMethod = ToDelegate(SelectWrapper<int, int>)
+    private static readonly MethodInfo EnumerableToEnumerableSync = ToDelegate(SelectWrapper<int, int>)
         .Method.GetGenericMethodDefinition();
 
-    private static readonly Dictionary<(Type, Type), MethodInfo> ConstructedSelectMethod = [];
+    private static readonly MethodInfo AsyncEnumToAsyncEnumSync = ToDelegate(SelectWrapperAsync<int, int>)
+        .Method.GetGenericMethodDefinition();
+    
+    private static readonly MethodInfo AsyncEnumToAsyncEnumAsync = ToDelegate(SelectAsyncWrapperAsync<int, int>)
+        .Method.GetGenericMethodDefinition();
+    
+    private static readonly MethodInfo EnumToAsyncEnumAsync = ToDelegate(EnumerableMapToAsyncEnumerable<int, int>)
+        .Method.GetGenericMethodDefinition();
+    
+    private static readonly MethodInfo EnumToAsyncEnumSync = ToDelegate(EnumerableMapToAsyncEnumerableSync<int, int>)
+        .Method.GetGenericMethodDefinition(); 
+    
+    private static readonly Dictionary<(Type, Type, Type), MethodInfo> ConstructedSelectMethod = [];
 
-    public static MethodInfo ConstructSelectMethod(Type from, Type to)
+    public static MethodInfo ConstructSelectMethod(Type containerType, Type from, Type to)
     {
-        if (!ConstructedSelectMethod.TryGetValue((from, to), out var method))
+        if (containerType.IsGenericType) containerType = containerType.GetGenericTypeDefinition();
+        
+        if (!ConstructedSelectMethod.TryGetValue((containerType, from, to), out var method))
         {
-            ConstructedSelectMethod.Add((from, to), method = SelectMethod.MakeGenericMethod(from ,to));
+            var isAsyncReturn = to.IsGenericType && (IsStable(typeof(Task<>), to) || IsStable(typeof(ValueTask<>), to));
+            if (IsAllInterfaceStable(typeof(IAsyncEnumerable<>), containerType))
+            {
+                method = isAsyncReturn ? AsyncEnumToAsyncEnumAsync.MakeGenericMethod(from, to) : AsyncEnumToAsyncEnumSync.MakeGenericMethod(from, to);
+            }
+            else if (IsAllInterfaceStable(typeof(IEnumerable<>), containerType))
+            {
+                method = isAsyncReturn ? EnumToAsyncEnumAsync.MakeGenericMethod(from, to) : EnumToAsyncEnumSync.MakeGenericMethod(from, to);
+            }
+            else
+            {
+                method = EnumerableToEnumerableSync.MakeGenericMethod(from, to);
+            }
+            
+            ConstructedSelectMethod.Add((containerType, from, to), method);
         }
 
         return method;
     }
+
+    private static IAsyncEnumerable<TOut> EnumerableMapToAsyncEnumerableSync<TIn, TOut>(IEnumerable<TIn> source,
+        Func<TIn, TOut> mapper)
+    {
+        return source.Select(mapper).ToAsyncEnumerable();
+    }
     
+    private static IAsyncEnumerable<TOut> EnumerableMapToAsyncEnumerable<TIn, TOut>(IEnumerable<TIn> source,
+        Func<TIn, ValueTask<TOut>> mapper)
+    {
+        return source.ToAsyncEnumerable().SelectAwait(async (item) => await mapper(item));
+    }
+
+    private static IAsyncEnumerable<TOut> SelectAsyncWrapperAsync<TIn, TOut>(IAsyncEnumerable<TIn> source,
+        Func<TIn, ValueTask<TOut>> mapper) => source.SelectAwait(async item => await mapper(item));
+
+    private static IAsyncEnumerable<TOut> SelectWrapperAsync<TIn, TOut>(IAsyncEnumerable<TIn> source,
+        Func<TIn, TOut> mapper) => source.Select(mapper);
+
     private static IEnumerable<TOut> SelectWrapper<TIn, TOut>(IEnumerable<TIn> source, Func<TIn, TOut> mapper)
         => source.Select(mapper);
 
@@ -218,14 +264,16 @@ public static class ExprTreeHelper
 
     private static readonly Dictionary<Type, LambdaExpression> UnknownSequenceToContainerSequenceMethod = [];
     private static readonly Dictionary<Type, Type> UnknownSequenceUnderlyingType = [];
-    public static (Type, IEnumerable<IContainer>) ConvertUnknownSequenceAsContainerizedSequence(MethodCallExpression sequence)
+    public static (Type, IAsyncEnumerable<IContainer>) ConvertUnknownSequenceAsContainerizedSequence(MethodCallExpression sequence)
     {
         var seqOriginalType = sequence.Method.ReturnType;
         if (!UnknownSequenceToContainerSequenceMethod.TryGetValue(seqOriginalType, out var method))
         {
             var sequenceType = seqOriginalType.GetInterfaces().Append(seqOriginalType)
-                                   .FirstOrDefault(type => IsGenericStable(typeof(IEnumerable<>), type))
-                               ?? throw new InvalidCastException();
+               .FirstOrDefault(type =>
+                   IsGenericStable(typeof(IEnumerable<>), type)
+                   || IsGenericStable(typeof(IAsyncEnumerable<>), type))
+                ?? throw new InvalidCastException();
         
             var underlyingType = sequenceType.GetGenericArguments().FirstOrDefault()
                                  ?? throw new InvalidProgramException();
@@ -240,7 +288,7 @@ public static class ExprTreeHelper
             // var convertMethod = MakeIdentity(sequenceType, containerized: false);
             // var id = Expression.Call(convertMethod, param);
             // box IEnumerable<T> to IEnumerable<IContainer>
-            var select = ConstructSelectMethod(underlyingType, typeof(IContainer));
+            var select = ConstructSelectMethod(sequenceType, underlyingType, typeof(IContainer));
             
             var convert = Expression.Call(null, select, param, mapper);
             
@@ -251,14 +299,12 @@ public static class ExprTreeHelper
         }
 
         var methodCall = Expression.Invoke(method, sequence);
-        var func = Expression.Lambda<Func<IEnumerable<IContainer>>>(methodCall).Compile();
+        var func = Expression.Lambda<Func<IAsyncEnumerable<IContainer>>>(methodCall).Compile();
         return (UnknownSequenceUnderlyingType[seqOriginalType], func());
     }
 
-    private static readonly Dictionary<Type, Func<IEnumerable<IContainer>, IContainer>> ContainerSequenceUnwrapMethod = [];
-    private static readonly Dictionary<Type, Func<IContainer>> EmptySequenceMethods =  [];
-    private static readonly MethodInfo EmptySeqMethod = ToDelegate(Enumerable.Empty<int>).Method.GetGenericMethodDefinition();
-    public static IContainer ConvertContainerSequenceAsContainerizedUnknownSequence(Type rawUnderlying, IEnumerable<IContainer> values)
+    private static readonly Dictionary<Type, Func<IAsyncEnumerable<IContainer>, IContainer>> ContainerSequenceUnwrapMethod = [];
+    public static IContainer ConvertContainerSequenceAsContainerizedUnknownSequence(Type rawUnderlying, IAsyncEnumerable<IContainer> values)
     {
         var underlying = IsStable(typeof(Task<>), rawUnderlying) || IsStable(typeof(ValueTask<>), rawUnderlying)
             ? rawUnderlying.GetGenericArguments()[0]
@@ -277,14 +323,14 @@ public static class ExprTreeHelper
             var containerGetterMethod = Expression.Constant(containerGetter.Compile());
             
             // IEnumerable<IContainer> => IEnumerable<underlying>
-            var seqParam = Expression.Parameter(typeof(IEnumerable<IContainer>));
-            var seqCaster = ConstructSelectMethod(typeof(IContainer), underlying);
+            var seqParam = Expression.Parameter(typeof(IAsyncEnumerable<IContainer>));
+            var seqCaster = ConstructSelectMethod(typeof(IAsyncEnumerable<>), typeof(IContainer), underlying);
             var callCast = Expression.Call(null, seqCaster, seqParam, containerGetterMethod);
 
             var box = GetBoxExprToContainerLambda(callCast.Type);
             var callBox = Expression.Invoke(box, callCast);
 
-            var callCastLambda = Expression.Lambda<Func<IEnumerable<IContainer>, IContainer>>(callBox, seqParam); 
+            var callCastLambda = Expression.Lambda<Func<IAsyncEnumerable<IContainer>, IContainer>>(callBox, seqParam); 
 
             ContainerSequenceUnwrapMethod.Add(underlying, method = callCastLambda.Compile());
         }
@@ -426,6 +472,11 @@ public static class ExprTreeHelper
                && target.GetGenericTypeDefinition() == source.GetGenericTypeDefinition();
     }
     
+    private static bool IsAllInterfaceStable(Type target, Type? source)
+    {
+        return IsStable(target, source)
+               || (source is not null && source.GetInterfaces().Any(@if => IsStable(target, @if)));
+    }
     private static bool IsStable(Type target, Type? source)
     {
         if (source is null) return false;

@@ -56,10 +56,10 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
     }
 
     private async IAsyncEnumerable<IContainer> InnerExecutePipe(
-        AsExecutionContext ctx, AsPipe pipe, IEnumerable<IContainer> previousValues,
+        AsExecutionContext ctx, AsPipe pipe, IAsyncEnumerable<IContainer> previousValues,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        foreach (var value in previousValues)
+        await foreach (var value in previousValues.WithCancellation(cancellationToken))
         {
             if (cancellationToken.IsCancellationRequested) yield break;
 
@@ -76,13 +76,10 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
         }
     }
 
-    private IEnumerable<IContainer> InnerExecutePipe(
-        AsExecutionContext ctx, AsPipe pipe, IEnumerable<IContainer> previousValues)
+    private IAsyncEnumerable<IContainer> InnerExecutePipe(
+        AsExecutionContext ctx, AsPipe pipe, IAsyncEnumerable<IContainer> previousValues)
     {
-        var executor = InnerExecutePipe(ctx, pipe, previousValues, ctx.CancelToken);
-        var all = executor.ToBlockingEnumerable();
-
-        return all;
+        return InnerExecutePipe(ctx, pipe, previousValues, ctx.CancelToken);
     }
     
     private async ValueTask<(AsIdentity, MethodCallExpression)> RunForEachPipe(
