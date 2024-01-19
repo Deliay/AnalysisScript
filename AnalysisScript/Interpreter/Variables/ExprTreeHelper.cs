@@ -225,33 +225,6 @@ public static class ExprTreeHelper
         return method;
     }
 
-    private static readonly Dictionary<(Type, Type), Func<IContainer, IContainer>>
-        CompiledConvertIContainerMethods = [];
-    
-    public static IContainer ConvertToInheritedTypeOfUnderlying(IContainer self, Type target)
-    {
-        if (CompiledConvertIContainerMethods.TryGetValue((self.UnderlyingType, target), out var method))
-        {
-            return method(self);
-        }
-        
-        var param = Expression.Parameter(typeof(IContainer));
-        
-        var containerUnbox = MakeIdentity(self.UnderlyingType);
-        var targetIdentity = MakeIdentity(target, containerized: false);
-
-        var castValue = Expression.Call(targetIdentity, Expression.Call(containerUnbox, param));
-
-        var boxMethod = GetBoxExprToContainerMethod(target);
-
-        var finalMethod = Expression.Call(boxMethod, castValue);
-        var compiled = Expression.Lambda<Func<IContainer, IContainer>>(finalMethod).Compile();
-        
-        CompiledConvertIContainerMethods.Add((self.UnderlyingType, target), method = compiled);
-        
-        return method(self);
-    }
-
     public static MethodCallExpression GetContainerValueLambda(IContainer container)
     {
         var constant = Expression.Constant(container);
@@ -435,29 +408,9 @@ public static class ExprTreeHelper
         }
     }
 
-    public static Func<object, IContainer> UnboxToContainer(object instance)
-    {
-        var instType = instance.GetType();
-        var type = GetContainerType(instType);
-
-        var parameter = Expression.Parameter(typeof(object), "value");
-        var castAs = Expression.TypeAs(parameter, instType);
-
-        var ctor = type.GetConstructors()[0];
-        var newContainer = Expression.New(ctor, castAs);
-
-        var castToIContainer = Expression.TypeAs(newContainer, typeof(IContainer));
-
-        return Expression.Lambda<Func<object, IContainer>>(castToIContainer, parameter).Compile();
-    }
-
     public static string GetTypeParamString(Type type) => $"{type.FullName}";
     public static string JoinTypeParams(IEnumerable<string> paramStrings) => string.Join(',', paramStrings);
 
-    public static string GetSignatureOf(IEnumerable<MethodCallExpression> parameters)
-    {
-        return GetSignatureOf(parameters.Select(param => param.Method.ReturnType));
-    }
     public static string GetSignatureOf(IEnumerable<Type> parameters)
     {
         var methodSignatures = parameters.Select(GetTypeParamString);
@@ -586,11 +539,6 @@ public static class ExprTreeHelper
         return true;
     }
 
-    public static (MethodCallExpression, string) BuildMethod(List<(MethodInfo, ConstantExpression?)> methods, IEnumerable<MethodCallExpression> parameters)
-    {
-        return BuildMethod(methods, parameters.Select(param => param.Method.ReturnType));
-
-    }
     public static (MethodCallExpression, string) BuildMethod(List<(MethodInfo, ConstantExpression?)> methods, IEnumerable<Type> parameters)
     {
         var parameterArray = parameters.ToList();
