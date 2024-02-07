@@ -142,7 +142,7 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
 
         var returnValue = await method();
 
-        await returnValue.AwaitIfUnderlyingIsKnownAwaitable();
+        await returnValue.AwaitIfUnderlyingIsKnownAwaitable(ctx.CancelToken);
     }
 
     private ValueTask ExecuteReturn(AsReturn @return)
