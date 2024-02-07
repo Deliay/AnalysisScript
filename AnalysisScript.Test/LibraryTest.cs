@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using AnalysisScript.Interpreter;
 using AnalysisScript.Interpreter.Variables;
 using AnalysisScript.Library;
@@ -236,7 +237,7 @@ public class LibraryTest
 
         var array = items as int[] ?? items.ToArray();
         
-        var actual = BasicFunctionV2.Json(DefaultContext, array);
+        var actual = BasicFunctionV2.ToJson(DefaultContext, array);
         
         Assert.Equal(JsonSerializer.Serialize(array), actual);
     }
@@ -247,7 +248,7 @@ public class LibraryTest
 
         var array = items.ToAsyncEnumerable();
         
-        var actual = await BasicFunctionV2.Json(DefaultContext, array);
+        var actual = await BasicFunctionV2.ToJson(DefaultContext, array);
         
         Assert.Equal(JsonSerializer.Serialize(items), actual);
     }
@@ -390,7 +391,7 @@ public class LibraryTest
         var variables = new VariableContext();
         variables.AddInitializeVariable("a", "123");
 
-        var ctx = new AsExecutionContext(variables, _ => { }, default);
+        var ctx = new AsExecutionContext(variables, null!, default);
 
         const string format = "${a}";
         var actual = BasicFunctionV2.Format(ctx, format);
@@ -501,5 +502,99 @@ public class LibraryTest
         var actual = BasicFunctionV2.Add(DefaultContext, Enumerable.Empty<int>().ToAsyncEnumerable(), 1);
 
         Assert.Equal(1, Assert.Single(await actual.ToListAsync()));
+    }
+
+    [Fact]
+    public void TestFilterIsNotNull()
+    {
+        var actual = BasicFunctionV2.FilterNotNull(DefaultContext, ["", "", null, ""]);
+        
+        Assert.Equal(3, actual.Count());
+    }
+
+    [Fact]
+    public async Task TestFilterIsNotNullAsync()
+    {
+        IEnumerable<string?> enumerable = ["", "", null, ""];
+        var actual = await BasicFunctionV2.FilterNotNull(DefaultContext, enumerable.ToAsyncEnumerable()).ToListAsync();
+        
+        Assert.Equal(3, actual.Count);
+    }
+
+    [Fact]
+    public void TestParseStringToJsonNode()
+    {
+        var jsonNode = BasicFunctionV2.ToJsonNode(DefaultContext, "{ \"a\": 1}");
+        
+        Assert.NotNull(jsonNode);
+        Assert.NotNull(jsonNode["a"]);
+        Assert.Equal(1, jsonNode["a"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public void TestParseStringToJsonNodeByObject()
+    {
+        var jsonNode = BasicFunctionV2.ToJsonNode(DefaultContext, new { a = 1 });
+        
+        Assert.NotNull(jsonNode);
+        Assert.NotNull(jsonNode["a"]);
+        Assert.Equal(1, jsonNode["a"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public async Task TestParseStringToJsonNodeByAsyncEnumerable()
+    {
+        var list = Enumerable.Repeat(new { a = 1 }, 1).ToAsyncEnumerable();
+        var jsonNode = await BasicFunctionV2.ToJsonNode(DefaultContext, list);
+        
+        Assert.NotNull(jsonNode);
+        Assert.Equal(1, Assert.Single(jsonNode.AsArray())!["a"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public void TestEvalJsonPathInJsonNode()
+    {
+        var node = JsonSerializer.SerializeToNode(new { a = 1 });
+
+        var result = BasicFunctionV2.EvalJsonPath(DefaultContext, node, "$.a");
+        
+        Assert.Equal(1, Assert.Single(result)!.GetValue<int>());
+    }
+
+    [Fact]
+    public void TestEvalJsonPathInJsonNodeResultEmpty()
+    {
+        var node = JsonSerializer.SerializeToNode(new { a = 1 });
+
+        var result = BasicFunctionV2.EvalJsonPath(DefaultContext, node, "$.b");
+        
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void TestEvalJsonPathInJsonString()
+    {
+        var node = JsonSerializer.Serialize(new { a = 1 });
+
+        var result = BasicFunctionV2.EvalJsonPath(DefaultContext, node, "$.a");
+        
+        Assert.Equal(1, Assert.Single(result).GetValue<int>());
+    }
+
+    [Fact]
+    public void TestEvalJsonPathInObject()
+    {
+        var result = BasicFunctionV2.EvalJsonPath(DefaultContext, new { a = 1 }, "$.a");
+        
+        Assert.Equal(1, Assert.Single(result).GetValue<int>());
+    }
+
+    [Fact]
+    public async Task TestEvalJsonPathInAsyncEnumerable()
+    {
+        var list = Enumerable.Repeat(new { a = 1 }, 1).ToAsyncEnumerable();
+        var result = await BasicFunctionV2.EvalJsonPath(DefaultContext, list, "$[0].a");
+        
+        Assert.Equal(1, Assert.Single(result).GetValue<int>());
     }
 }
