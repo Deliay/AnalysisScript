@@ -1,11 +1,10 @@
 ﻿using AnalysisScript.Interpreter;
 using System.Linq.Expressions;
-using System.Net.Http.Json;
-using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using AnalysisScript.Interpreter.Variables;
-using AnalysisScript.Parser.Ast.Basic;
+using Json.Path;
 
 namespace AnalysisScript.Library;
 
@@ -22,7 +21,7 @@ public static class BasicFunctionV2
 
         return regex;
     }
-
+    
     [AsMethod(Name = "select")]
     public static LambdaExpression SelectSingle<T>(AsExecutionContext ctx, T @this, string propertyName)
     {
@@ -245,12 +244,24 @@ public static class BasicFunctionV2
     {
         return values.Where((item) => !item.Contains(contains));
     }
+    
+    [AsMethod(Name = "filter_not_null")]
+    public static IEnumerable<T> FilterNotNull<T>(AsExecutionContext ctx, IEnumerable<T> values)
+    {
+        return values.Where((item) => item is not null);
+    }
+    
+    [AsMethod(Name = "filter_not_null")]
+    public static IAsyncEnumerable<T> FilterNotNull<T>(AsExecutionContext ctx, IAsyncEnumerable<T> values)
+    {
+        return values.Where((item) => item is not null);
+    }
 
     [AsMethod(Name = "json")]
-    public static string Json<T>(AsExecutionContext ctx, T obj) => JsonSerializer.Serialize(obj);
+    public static string ToJson<T>(AsExecutionContext ctx, T obj) => JsonSerializer.Serialize(obj);
 
     [AsMethod(Name = "json")]
-    public static async ValueTask<string> Json<T>(AsExecutionContext ctx, IAsyncEnumerable<T> obj) =>
+    public static async ValueTask<string> ToJson<T>(AsExecutionContext ctx, IAsyncEnumerable<T> obj) =>
         JsonSerializer.Serialize(await obj.ToArrayAsync());
 
     [AsMethod(Name = "group")]
@@ -375,7 +386,64 @@ public static class BasicFunctionV2
     {
         return seq.Append(item);
     }
+
+
+    [AsMethod(Name = "json_node")]
+    public static JsonNode? ToJsonNode(AsExecutionContext ctx, string obj)
+    {
+        return JsonNode.Parse(obj);
+    }
     
+    [AsMethod(Name = "json_node")]
+    public static JsonNode? ToJsonNode<T>(AsExecutionContext ctx, T obj)
+    {
+        return JsonSerializer.SerializeToNode(obj);
+    }
+    
+    [AsMethod(Name = "json_node")]
+    public static async ValueTask<JsonNode?> ToJsonNode<T>(AsExecutionContext ctx, IAsyncEnumerable<T> obj)
+    {
+        return JsonSerializer.SerializeToNode(await obj.ToListAsync(ctx.CancelToken));
+    }
+
+    private static readonly Dictionary<string, JsonPath> JsonPathCaches = [];
+
+    [AsMethod(Name = "json_path")]
+    public static IEnumerable<JsonNode?> EvalJsonPath(AsExecutionContext ctx, JsonNode? json, string path)
+    {
+        if (!JsonPathCaches.TryGetValue(path, out var jsonPath)) jsonPath = JsonPath.Parse(path);
+
+        var result = jsonPath.Evaluate(json);
+
+        if (result.Error is not null || result.Matches is null || result.Matches.Count == 0)
+        {
+            return Enumerable.Empty<JsonNode?>();
+        }
+
+        return result.Matches.Select(node => node.Value);
+    }
+
+    [AsMethod(Name = "json_path")]
+    public static IEnumerable<JsonNode?> EvalJsonPath(AsExecutionContext ctx, string obj, string path)
+    {
+        
+        return EvalJsonPath(ctx, ToJsonNode(ctx, obj), path);
+    }
+
+    [AsMethod(Name = "json_path")]
+    public static IEnumerable<JsonNode?> EvalJsonPath<T>(AsExecutionContext ctx, T obj, string path)
+    {
+        
+        return EvalJsonPath(ctx, ToJsonNode(ctx, obj), path);
+    }
+
+    [AsMethod(Name = "json_path")]
+    public static async ValueTask<IEnumerable<JsonNode?>> EvalJsonPath<T>(AsExecutionContext ctx, IAsyncEnumerable<T> obj, string path)
+    {
+        var list = await obj.ToListAsync(ctx.CancelToken);
+        return EvalJsonPath(ctx, ToJsonNode(ctx, list), path);
+    }
+
     public static AsInterpreter RegisterBasicFunctionsV2(this AsInterpreter interpreter)
     {
         interpreter.Variables.Methods.ScanAndRegisterStaticFunction(typeof(BasicFunctionV2));
