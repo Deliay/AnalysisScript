@@ -140,7 +140,9 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
     {
         var method = Variables.GetMethodCallLambda(call.Method.Name, call.Args, ctx).Compile();
 
-        await method();
+        var returnValue = await method();
+
+        await returnValue.AwaitIfUnderlyingIsKnownAwaitable();
     }
 
     private ValueTask ExecuteReturn(AsReturn @return)
