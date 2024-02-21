@@ -444,6 +444,31 @@ public static class BasicFunctionV2
         return EvalJsonPath(ctx, ToJsonNode(ctx, list), path);
     }
 
+    [AsMethod(Name = "days")]
+    public static TimeSpan Days(AsExecutionContext ctx, long duration) => TimeSpan.FromDays(duration);
+    
+    [AsMethod(Name = "hours")]
+    public static TimeSpan Hours(AsExecutionContext ctx, long duration) => TimeSpan.FromHours(duration);
+    
+    [AsMethod(Name = "minutes")]
+    public static TimeSpan Minutes(AsExecutionContext ctx, long duration) => TimeSpan.FromMinutes(duration);
+    
+    [AsMethod(Name = "seconds")]
+    public static TimeSpan Seconds(AsExecutionContext ctx, long duration) => TimeSpan.FromSeconds(duration);
+    
+    [AsMethod(Name = "add")]
+    public static DateTime Add(AsExecutionContext ctx, DateTime time, TimeSpan timeSpan) => time.Add(timeSpan);
+    
+    [AsMethod(Name = "add")]
+    public static DateTimeOffset Add(AsExecutionContext ctx, DateTimeOffset time, TimeSpan timeSpan) => time.Add(timeSpan);
+
+    [AsMethod(Name = "eval")]
+    public static List<T> Eval<T>(AsExecutionContext ctx, IEnumerable<T> seq) => seq.ToList();
+
+    [AsMethod(Name = "eval")]
+    public static ValueTask<List<T>> Eval<T>(AsExecutionContext ctx, IAsyncEnumerable<T> seq) =>
+        seq.ToListAsync(ctx.CancelToken);
+    
     public static AsInterpreter RegisterBasicFunctionsV2(this AsInterpreter interpreter)
     {
         interpreter.Variables.Methods.ScanAndRegisterStaticFunction(typeof(BasicFunctionV2));

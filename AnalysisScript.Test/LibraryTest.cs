@@ -597,4 +597,43 @@ public class LibraryTest
         
         Assert.Equal(1, Assert.Single(result).GetValue<int>());
     }
+
+    [Fact]
+    public void TestTimeSpanGenerator()
+    {
+        Assert.Equal(TimeSpan.FromSeconds(1), BasicFunctionV2.Seconds(DefaultContext, 1));
+        Assert.Equal(TimeSpan.FromMinutes(1), BasicFunctionV2.Minutes(DefaultContext, 1));
+        Assert.Equal(TimeSpan.FromHours(1), BasicFunctionV2.Hours(DefaultContext, 1));
+        Assert.Equal(TimeSpan.FromDays(1), BasicFunctionV2.Days(DefaultContext, 1));
+    }
+
+    [Fact]
+    public void TestDateTimeAdd()
+    {
+        var now = DateTime.Now;
+        var span = TimeSpan.FromDays(1);
+        Assert.Equal(now + span, BasicFunctionV2.Add(DefaultContext, now, span));
+    }
+
+    [Fact]
+    public void TestDateTimeOffsetAdd()
+    {
+        var now = DateTimeOffset.Now;
+        var span = TimeSpan.FromDays(1);
+        Assert.Equal(now + span, BasicFunctionV2.Add(DefaultContext, now, span));
+    }
+
+    [Fact]
+    public void TestCanEvalSequence()
+    {
+        IEnumerable<int> seq = [1];
+        Assert.Equal(1, Assert.Single(BasicFunctionV2.Eval(DefaultContext, seq)));
+    }
+    [Fact]
+    public async Task TestCanEvalSequenceAsync()
+    {
+        IEnumerable<int> seq = [1];
+        var asyncSeq = seq.ToAsyncEnumerable();
+        Assert.Equal(1, Assert.Single(await BasicFunctionV2.Eval(DefaultContext, asyncSeq)));
+    }
 }
