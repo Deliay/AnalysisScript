@@ -7,7 +7,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/Deliay/AnalysisScript/</RepositoryUrl>
     <Description>A super mini script for data processing</Description>
-    <Version>1.0.3-beta.1</Version>
+    <Version>1.0.3-beta.2</Version>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
