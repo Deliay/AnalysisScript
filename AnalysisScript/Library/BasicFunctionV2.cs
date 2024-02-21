@@ -462,6 +462,9 @@ public static class BasicFunctionV2
     [AsMethod(Name = "add")]
     public static DateTimeOffset Add(AsExecutionContext ctx, DateTimeOffset time, TimeSpan timeSpan) => time.Add(timeSpan);
 
+    [AsMethod(Name = "add")]
+    public static DateTimeOffset Add(AsExecutionContext ctx, TimeSpan timeSpan, DateTimeOffset time) => time.Add(timeSpan);
+
     [AsMethod(Name = "eval")]
     public static List<T> Eval<T>(AsExecutionContext ctx, IEnumerable<T> seq) => seq.ToList();
 
