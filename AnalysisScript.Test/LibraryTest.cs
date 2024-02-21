@@ -624,11 +624,20 @@ public class LibraryTest
     }
 
     [Fact]
+    public void TestDateTimeOffsetAdd2()
+    {
+        var now = DateTimeOffset.Now;
+        var span = TimeSpan.FromDays(1);
+        Assert.Equal(now + span, BasicFunctionV2.Add(DefaultContext, span, now));
+    }
+
+    [Fact]
     public void TestCanEvalSequence()
     {
         IEnumerable<int> seq = [1];
         Assert.Equal(1, Assert.Single(BasicFunctionV2.Eval(DefaultContext, seq)));
     }
+    
     [Fact]
     public async Task TestCanEvalSequenceAsync()
     {
