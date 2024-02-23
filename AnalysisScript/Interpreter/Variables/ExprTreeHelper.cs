@@ -21,13 +21,13 @@ public static class ExprTreeHelper
     private static readonly MethodInfo EnumToAsyncEnumSync = ToDelegate(EnumerableMapToAsyncEnumerableSync<int, int>)
         .Method.GetGenericMethodDefinition(); 
     
-    private static readonly Dictionary<(Type, Type, Type), MethodInfo> ConstructedSelectMethod = [];
+    private static readonly Dictionary<(Type, Type, Type, bool), MethodInfo> ConstructedSelectMethod = [];
 
-    public static MethodInfo ConstructSelectMethod(Type containerType, Type from, Type to)
+    public static MethodInfo ConstructSelectMethod(Type containerType, Type from, Type to, bool forceSync = false)
     {
         if (containerType.IsGenericType) containerType = containerType.GetGenericTypeDefinition();
         
-        if (!ConstructedSelectMethod.TryGetValue((containerType, from, to), out var method))
+        if (!ConstructedSelectMethod.TryGetValue((containerType, from, to, forceSync), out var method))
         {
             var isAsyncReturn = to.IsGenericType && (IsStable(typeof(Task<>), to) || IsStable(typeof(ValueTask<>), to));
             if (IsAllInterfaceStable(typeof(IAsyncEnumerable<>), containerType))
@@ -36,14 +36,18 @@ public static class ExprTreeHelper
             }
             else if (IsAllInterfaceStable(typeof(IEnumerable<>), containerType))
             {
-                method = isAsyncReturn ? EnumToAsyncEnumAsync.MakeGenericMethod(from, to) : EnumerableToEnumerableSync.MakeGenericMethod(from, to);
+                method = isAsyncReturn
+                    ? EnumToAsyncEnumAsync.MakeGenericMethod(from, to)
+                    : forceSync
+                        ? EnumerableToEnumerableSync.MakeGenericMethod(from, to)
+                        : EnumToAsyncEnumSync.MakeGenericMethod(from, to);
             }
             else
             {
                 method = EnumerableToEnumerableSync.MakeGenericMethod(from, to);
             }
             
-            ConstructedSelectMethod.Add((containerType, from, to), method);
+            ConstructedSelectMethod.Add((containerType, from, to, forceSync), method);
         }
 
         return method;

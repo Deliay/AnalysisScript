@@ -24,16 +24,16 @@ public class LibraryTest
     }
     
     [Fact]
-    public async Task TestSelectEnumerable()
+    public void TestSelectEnumerable()
     {
         List<List<int>> test = [[1],[2]];
         var prop = nameof(test.Count);
         var lambda = BasicFunctionV2.SelectSequence(DefaultContext, test, prop);
 
-        var method = Expression.Lambda<Func<IAsyncEnumerable<int>>>(Expression.Invoke(lambda)).Compile();
+        var method = Expression.Lambda<Func<IEnumerable<int>>>(Expression.Invoke(lambda)).Compile();
 
         var result = method();
-        Assert.Equal(2, await result.SumAsync());
+        Assert.Equal(2, result.Sum());
     }
     [Fact]
     public async Task TestSelectAsyncEnumerable()
