@@ -5,6 +5,8 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using AnalysisScript.Interpreter.Variables;
+using AnalysisScript.Lexical;
+using AnalysisScript.Parser.Ast.Basic;
 using Json.Path;
 
 namespace AnalysisScript.Library;
@@ -409,10 +411,18 @@ public static class BasicFunctionV2
 
     private static readonly Dictionary<string, JsonPath> JsonPathCaches = [];
 
+    private static JsonPath GetJsonPath(string path)
+    {
+        if (!JsonPathCaches.TryGetValue(path, out var jsonPath)) 
+            JsonPathCaches.Add(path, jsonPath = JsonPath.Parse(path));
+
+        return jsonPath;
+    }
+
     [AsMethod(Name = "json_path")]
     public static IEnumerable<JsonNode?> EvalJsonPath(AsExecutionContext ctx, JsonNode? json, string path)
     {
-        if (!JsonPathCaches.TryGetValue(path, out var jsonPath)) jsonPath = JsonPath.Parse(path);
+        var jsonPath = GetJsonPath(path);
 
         var result = jsonPath.Evaluate(json);
 
@@ -513,6 +523,52 @@ public static class BasicFunctionV2
                 yield return match.Groups[index].Value;
         }
     }
+
+    private static readonly IReadOnlyList<AsIdentity> FormatIds = Enumerable.Range(0, 99)
+        .Select(idx => new AsIdentity(new Token.Identity($"${idx}", 0, 0)))
+        .ToList();
+    
+    [AsMethod(Name = "regex_format")]
+    public static string? RegexFormat(AsExecutionContext ctx, string content, string regexStr, string format)
+    {
+        var regex = GetRegex(regexStr);
+        var match = regex.Match(content);
+        
+        if (!match.Success) return null;
+        var idList = Enumerable.Range(0, match.Length).ToArray();
+        foreach (var idx in idList)
+        {
+            ctx.VariableContext.AddOrUpdateVariable(FormatIds[idx], IContainer.Of(match.Groups[idx].Value));
+        }
+
+        var result = Format(ctx, format);
+
+        foreach (var idx in idList)
+        {
+            ctx.VariableContext.UnsetVariable(FormatIds[idx]);
+        }
+
+        return result;
+    }
+
+    [AsMethod(Name = "regex_format")]
+    public static IEnumerable<string> RegexFormat(AsExecutionContext ctx, IEnumerable<string> content, 
+        string regexStr, string format)
+    {
+        return content
+            .Select(str => RegexFormat(ctx, str, regexStr, format))
+            .OfType<string>();
+    }
+    
+    [AsMethod(Name = "regex_format")]
+    public static IAsyncEnumerable<string> RegexFormatAsync(AsExecutionContext ctx, IAsyncEnumerable<string> content, 
+        string regexStr, string format)
+    {
+        return content
+            .Select(str => RegexFormat(ctx, str, regexStr, format))
+            .OfType<string>();
+    }
+
     
     public static AsInterpreter RegisterBasicFunctionsV2(this AsInterpreter interpreter)
     {
