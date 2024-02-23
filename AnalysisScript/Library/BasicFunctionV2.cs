@@ -43,7 +43,7 @@ public static class BasicFunctionV2
         var thisParam = ExprTreeHelper.GetConstantValueLambda(@this);
 
         var mapperMethod = Expression.Lambda(property, param);
-        var selectMethod = ExprTreeHelper.ConstructSelectMethod(typeof(IEnumerable<>), typeof(T), property.Type);
+        var selectMethod = ExprTreeHelper.ConstructSelectMethod(typeof(IEnumerable<>), typeof(T), property.Type, forceSync: true);
 
         var callSelect = Expression.Call(null, selectMethod, thisParam, mapperMethod);
 
