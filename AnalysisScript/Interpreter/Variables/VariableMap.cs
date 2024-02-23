@@ -23,6 +23,12 @@ public class VariableMap : IEnumerable<KeyValuePair<AsIdentity, IContainer>>
         _varMap.Add(newId, val);
     }
 
+    internal void Unset(AsIdentity id)
+    {
+        _varMap.Remove(id);
+        _nameMap.Remove(id.Name);
+    }
+
     internal void UpdateReference(AsIdentity id, IContainer container)
     {
         _varMap[id] = container;

@@ -58,6 +58,11 @@ public class VariableContext(MethodContext methods)
         else _variables.Add(id, value);
     }
 
+    internal void UnsetVariable(AsIdentity id)
+    {
+        _variables.Unset(id);
+    }
+
     public bool HasVariable(AsIdentity id) => _variables.ContainsKey(id);
 
     public void UpdateVariable(AsIdentity id)
