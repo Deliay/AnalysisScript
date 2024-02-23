@@ -534,9 +534,8 @@ public static class BasicFunctionV2
     public static string? RegexFormat(AsExecutionContext ctx, string content, string regexStr, string format)
     {
         var regex = GetRegex(regexStr);
-        var match = regex.IsMatch(content);
-        
-        return !match ? null : regex.Replace(content, format);
+        var replaceResult = regex.Replace(content, format);
+        return ReferenceEquals(replaceResult, content) ? null : replaceResult;
     }
 
     [AsMethod(Name = "regex_format")]
