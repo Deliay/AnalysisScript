@@ -435,6 +435,18 @@ public class LibraryTest
     }
 
     [Fact]
+    public async Task TestFlatEnumInnerAsyncEnumAsync()
+    {
+        IEnumerable<int> seqA = [1, 2];
+        IEnumerable<int> seqB = [3, 4];
+        IEnumerable<IAsyncEnumerable<int>> seq = [seqA.ToAsyncEnumerable(), seqB.ToAsyncEnumerable()];
+
+        var actual = BasicFunctionV2.FlatAsync(DefaultContext, seq);
+        
+        Assert.Equal(10, await actual.SumAsync());
+    }
+
+    [Fact]
     public void TestListOf()
     {
         var actual = BasicFunctionV2.ListOf(DefaultContext, [1]);
