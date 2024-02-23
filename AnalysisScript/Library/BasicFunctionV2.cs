@@ -338,6 +338,12 @@ public static class BasicFunctionV2
     }
 
     [AsMethod(Name = "flat")]
+    public static IAsyncEnumerable<T> FlatAsync<T>(AsExecutionContext ctx, IEnumerable<IAsyncEnumerable<T>> arrayList)
+    {
+        return arrayList.ToAsyncEnumerable().SelectMany(array => array);
+    }
+
+    [AsMethod(Name = "flat")]
     public static IAsyncEnumerable<T> FlatAsync<T>(AsExecutionContext ctx, IAsyncEnumerable<IAsyncEnumerable<T>> arrayList)
     {
         return arrayList.SelectMany(array => array);
