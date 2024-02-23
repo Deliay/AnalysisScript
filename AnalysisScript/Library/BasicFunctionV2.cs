@@ -524,31 +524,13 @@ public static class BasicFunctionV2
         }
     }
 
-    private static readonly IReadOnlyList<AsIdentity> FormatIds = Enumerable.Range(0, 99)
-        .Select(idx => new AsIdentity(new Token.Identity($"${idx}", 0, 0)))
-        .ToList();
-    
     [AsMethod(Name = "regex_format")]
     public static string? RegexFormat(AsExecutionContext ctx, string content, string regexStr, string format)
     {
         var regex = GetRegex(regexStr);
-        var match = regex.Match(content);
+        var match = regex.IsMatch(content);
         
-        if (!match.Success) return null;
-        var idList = Enumerable.Range(0, match.Length).ToArray();
-        foreach (var idx in idList)
-        {
-            ctx.VariableContext.AddOrUpdateVariable(FormatIds[idx], IContainer.Of(match.Groups[idx].Value));
-        }
-
-        var result = Format(ctx, format);
-
-        foreach (var idx in idList)
-        {
-            ctx.VariableContext.UnsetVariable(FormatIds[idx]);
-        }
-
-        return result;
+        return !match ? null : regex.Replace(content, format);
     }
 
     [AsMethod(Name = "regex_format")]

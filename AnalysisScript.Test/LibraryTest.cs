@@ -689,7 +689,7 @@ public class LibraryTest
 
         var ctx = new AsExecutionContext(variables, null!, default);
 
-        var actual = BasicFunctionV2.RegexFormat(ctx, "123abc456", @"^(\d+)[a-z]+(\d+)", "${$1}${$2}");
+        var actual = BasicFunctionV2.RegexFormat(ctx, "123abc456", @"^(\d+)[a-z]+(\d+)", "$1$2");
         
         Assert.Equal("123456", actual);
     }
@@ -701,7 +701,7 @@ public class LibraryTest
 
         var ctx = new AsExecutionContext(variables, null!, default);
 
-        var actual = BasicFunctionV2.RegexFormat(ctx, "a123abc456", @"^(\d+)[a-z]+(\d+)", "${$1}${$2}");
+        var actual = BasicFunctionV2.RegexFormat(ctx, "a123abc456", @"^(\d+)[a-z]+(\d+)", "$1$2");
         
         Assert.Null(actual);
     }
@@ -715,7 +715,7 @@ public class LibraryTest
 
         IEnumerable<string> raw = ["123abc456", "abc123def"];
         
-        var actual = BasicFunctionV2.RegexFormat(ctx, raw, @"^(\d+)[a-z]+(\d+)", "${$1}${$2}");
+        var actual = BasicFunctionV2.RegexFormat(ctx, raw, @"^(\d+)[a-z]+(\d+)", "$1$2");
         
         Assert.Equal("123456", Assert.Single(actual));
     }
@@ -728,7 +728,7 @@ public class LibraryTest
 
         IEnumerable<string> raw = ["123abc456", "abc123def"];
         
-        var actual = await BasicFunctionV2.RegexFormatAsync(ctx, raw.ToAsyncEnumerable(), @"^(\d+)[a-z]+(\d+)", "${$1}${$2}")
+        var actual = await BasicFunctionV2.RegexFormatAsync(ctx, raw.ToAsyncEnumerable(), @"^(\d+)[a-z]+(\d+)", "$1$2")
             .ToListAsync();
         
         Assert.Equal("123456", Assert.Single(actual));
