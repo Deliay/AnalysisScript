@@ -1,4 +1,5 @@
-﻿using AnalysisScript.Interpreter;
+﻿using System.Diagnostics.CodeAnalysis;
+using AnalysisScript.Interpreter;
 using System.Linq.Expressions;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -471,6 +472,50 @@ public static class BasicFunctionV2
     [AsMethod(Name = "eval")]
     public static ValueTask<List<T>> Eval<T>(AsExecutionContext ctx, IAsyncEnumerable<T> seq) =>
         seq.ToListAsync(ctx.CancelToken);
+
+    [AsMethod(Name = "pluck")]
+    public static string? Pluck(AsExecutionContext ctx, string content, 
+        [StringSyntax("regex")]string regexStr, int index)
+    {
+        var regex = GetRegex(regexStr);
+        var match = regex.Match(content);
+        
+        if (!match.Success) return null;
+
+        return match.Groups[index].Success
+            ? match.Groups[index].Value
+            : null;
+    }
+    
+    [AsMethod(Name = "pluck")]
+    public static IEnumerable<string> Pluck(AsExecutionContext ctx, IEnumerable<string> contents, 
+        [StringSyntax("regex")]string regexStr, int index)
+    {
+        var regex = GetRegex(regexStr);
+
+        foreach (var content in contents)
+        {
+            var match = regex.Match(content);
+
+            if (match.Success && match.Groups[index].Success)
+                yield return match.Groups[index].Value;
+        }
+    }
+    
+    [AsMethod(Name = "pluck")]
+    public static async IAsyncEnumerable<string> PluckAsync(AsExecutionContext ctx, IAsyncEnumerable<string> contents, 
+        [StringSyntax("regex")]string regexStr, int index)
+    {
+        var regex = GetRegex(regexStr);
+
+        await foreach (var content in contents)
+        {
+            var match = regex.Match(content);
+
+            if (match.Success && match.Groups[index].Success)
+                yield return match.Groups[index].Value;
+        }
+    }
     
     public static AsInterpreter RegisterBasicFunctionsV2(this AsInterpreter interpreter)
     {
