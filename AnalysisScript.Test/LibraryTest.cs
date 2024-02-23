@@ -645,4 +645,39 @@ public class LibraryTest
         var asyncSeq = seq.ToAsyncEnumerable();
         Assert.Equal(1, Assert.Single(await BasicFunctionV2.Eval(DefaultContext, asyncSeq)));
     }
+
+    [Fact]
+    public void TestPluckSingleElement()
+    {
+        var result = BasicFunctionV2.Pluck(DefaultContext, "rlt:1", @"rlt:(\d+)", 1);
+        
+        Assert.Equal("1", result);
+    }
+
+    [Fact]
+    public void TestPluckSingleElementReturnNullIfNotMatched()
+    {
+        var result = BasicFunctionV2.Pluck(DefaultContext, "rlt:a", @"rlt:(\d+)", 1);
+        
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void TestPluckManyElement()
+    {
+        var result = BasicFunctionV2.Pluck(DefaultContext, ["rlt:aa", "rlt:ab", "rlt:bb"], @"rlt:(a.)", 1);
+        
+        Assert.Equal("aa,ab", string.Join(',', result));
+    }
+
+    [Fact]
+    public async Task TestPluckManyElementAsync()
+    {
+        IEnumerable<string> items = ["rlt:aa", "rlt:ab", "rlt:bb"];
+        var result = await BasicFunctionV2
+            .PluckAsync(DefaultContext, items.ToAsyncEnumerable(), @"rlt:(a.)", 1)
+            .ToListAsync();
+        
+        Assert.Equal("aa,ab", string.Join(',', result));
+    }
 }
