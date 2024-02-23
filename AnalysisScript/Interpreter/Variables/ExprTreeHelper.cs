@@ -36,7 +36,7 @@ public static class ExprTreeHelper
             }
             else if (IsAllInterfaceStable(typeof(IEnumerable<>), containerType))
             {
-                method = isAsyncReturn ? EnumToAsyncEnumAsync.MakeGenericMethod(from, to) : EnumToAsyncEnumSync.MakeGenericMethod(from, to);
+                method = isAsyncReturn ? EnumToAsyncEnumAsync.MakeGenericMethod(from, to) : EnumerableToEnumerableSync.MakeGenericMethod(from, to);
             }
             else
             {
