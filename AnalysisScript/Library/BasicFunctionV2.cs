@@ -19,7 +19,7 @@ public static class BasicFunctionV2
     {
         if (!RegexCache.TryGetValue(regexStr, out var regex))
         {
-            RegexCache.Add(regexStr, regex = new Regex(regexStr));
+            RegexCache.Add(regexStr, regex = new Regex(regexStr, RegexOptions.Compiled));
         }
 
         return regex;
