@@ -127,6 +127,7 @@ public static class LexicalAnalyzer
                             's' => ' ',
                             'b' => '\b',
                             'n' => '\n',
+                            '\\' => '\\',
                             _ => throw new InvalidTokenException(pos, $"\\{current}")
                         };
                     }
