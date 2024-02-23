@@ -473,9 +473,8 @@ public static class BasicFunctionV2
     public static ValueTask<List<T>> Eval<T>(AsExecutionContext ctx, IAsyncEnumerable<T> seq) =>
         seq.ToListAsync(ctx.CancelToken);
 
-    [AsMethod(Name = "pluck")]
-    public static string? Pluck(AsExecutionContext ctx, string content, 
-        [StringSyntax("regex")]string regexStr, int index)
+    [AsMethod(Name = "regex_pluck")]
+    public static string? Pluck(AsExecutionContext ctx, string content, string regexStr, int index)
     {
         var regex = GetRegex(regexStr);
         var match = regex.Match(content);
@@ -487,9 +486,8 @@ public static class BasicFunctionV2
             : null;
     }
     
-    [AsMethod(Name = "pluck")]
-    public static IEnumerable<string> Pluck(AsExecutionContext ctx, IEnumerable<string> contents, 
-        [StringSyntax("regex")]string regexStr, int index)
+    [AsMethod(Name = "regex_pluck")]
+    public static IEnumerable<string> Pluck(AsExecutionContext ctx, IEnumerable<string> contents, string regexStr, int index)
     {
         var regex = GetRegex(regexStr);
 
@@ -502,9 +500,8 @@ public static class BasicFunctionV2
         }
     }
     
-    [AsMethod(Name = "pluck")]
-    public static async IAsyncEnumerable<string> PluckAsync(AsExecutionContext ctx, IAsyncEnumerable<string> contents, 
-        [StringSyntax("regex")]string regexStr, int index)
+    [AsMethod(Name = "regex_pluck")]
+    public static async IAsyncEnumerable<string> PluckAsync(AsExecutionContext ctx, IAsyncEnumerable<string> contents, string regexStr, int index)
     {
         var regex = GetRegex(regexStr);
 
