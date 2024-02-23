@@ -55,4 +55,10 @@ public class VariableMap : IEnumerable<KeyValuePair<AsIdentity, IContainer>>
             && _varMap.TryGetValue(id, out container!);
     }
 
+    public void Clear()
+    {
+        _varMap.Clear();
+        _nameMap.Clear();
+    }
+    
 }
