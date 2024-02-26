@@ -1,7 +1,11 @@
-﻿namespace AnalysisScript.Interpreter;
+﻿using AnalysisScript.Lexical;
 
-public class AsRuntimeException(AsExecutionContext context, Exception inner)
-    : Exception($"Execution failed at line {context.CurrentExecuteObject?.LexicalToken.Line}: {context.CurrentExecuteObject}\n{inner.Message}", inner)
+namespace AnalysisScript.Interpreter;
+
+public class AsRuntimeException(AsExecutionContext ctx, Exception? inner, AsRuntimeError runtimeError = AsRuntimeError.Unknown)
+    : Exception($"{runtimeError} at line {ctx.CurrentExecuteObject?.LexicalToken.Line}" +
+                $": {ctx.CurrentExecuteObject?.LexicalToken.ToReadableString()}\n{inner?.Message}", inner)
 {
-    public AsExecutionContext Context => context;
+    public AsRuntimeError RuntimeError => runtimeError;
+    public AsExecutionContext Context => ctx;
 }

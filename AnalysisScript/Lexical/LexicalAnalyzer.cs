@@ -130,7 +130,7 @@ public static class LexicalAnalyzer
                             'b' => '\b',
                             'n' => '\n',
                             '\\' => '\\',
-                            _ => throw new InvalidTokenException(pos, $"\\{current}")
+                            _ => throw new InvalidTokenException(pos, line, $"\\{current}")
                         };
                     }
                     else val += current;
@@ -149,7 +149,7 @@ public static class LexicalAnalyzer
                 yield return new Token.Comment(val, pos, line);
                 yield return new Token.NewLine(pos, ++line);
             }
-            else throw new InvalidTokenException(pos, current.ToString());
+            else throw new InvalidTokenException(pos, line, current.ToString());
         } while (HasMore());
 
         yield return new Token.NewLine(pos, ++line);

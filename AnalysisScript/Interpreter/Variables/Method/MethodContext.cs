@@ -171,4 +171,6 @@ public class MethodContext
 
         return method;
     }
+
+    public bool HasMethod(string name) => _rawMethod.ContainsKey(name);
 }

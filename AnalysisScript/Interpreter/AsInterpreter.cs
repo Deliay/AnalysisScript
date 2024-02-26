@@ -238,6 +238,10 @@ public class AsInterpreter(AsAnalysis tree, VariableContext variableContext) : I
                 await RunCommand(ctx, cmd);
             }
         }
+        catch (VariableAlreadyExistsException ex)
+        {
+            throw new AsRuntimeException(ctx, ex, AsRuntimeError.VariableAlreadyExist);
+        }
         catch (Exception ex) 
         {
             throw new AsRuntimeException(ctx, ex);

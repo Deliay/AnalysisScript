@@ -256,7 +256,7 @@ public class LibraryTest
     public void TestGroup()
     {
         IEnumerable<int> items = [1, 2, 1, 2];
-        var actual = BasicFunctionV2.Group(DefaultContext, items);
+        var actual = BasicFunctionV2.Group(DefaultContext, items).ToList();
         
         Assert.Equal(2, actual.Count);
         Assert.Equal(3, actual.Sum());
@@ -265,7 +265,8 @@ public class LibraryTest
     public async Task TestGroupAsync()
     {
         IEnumerable<int> items = [1, 2, 1, 2];
-        var actual = await BasicFunctionV2.Group(DefaultContext, items.ToAsyncEnumerable());
+        var actual = await BasicFunctionV2.Group(DefaultContext, items.ToAsyncEnumerable())
+            .ToListAsync();
         
         Assert.Equal(2, actual.Count);
         Assert.Equal(3, actual.Sum());

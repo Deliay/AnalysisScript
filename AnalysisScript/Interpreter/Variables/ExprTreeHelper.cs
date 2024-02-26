@@ -422,14 +422,14 @@ public static class ExprTreeHelper
         return JoinTypeParams(methodSignatures);
     }
 
-    private static bool IsGenericStable(Type target, Type? source)
+    public static bool IsGenericStable(Type target, Type? source)
     {
         if (source is null) return false;
         
         return source.IsGenericType
                && target.GetGenericTypeDefinition() == source.GetGenericTypeDefinition();
     }
-    
+
     private static bool IsAllInterfaceStable(Type target, Type? source)
     {
         return IsStable(target, source)
@@ -448,7 +448,7 @@ public static class ExprTreeHelper
         return target == source;
     }
     
-    private static Type? FindStableType(Type target, Type source)
+    public static Type? FindStableType(Type target, Type source)
     {
         if (IsStable(target, source)) return source;
 
@@ -564,7 +564,18 @@ public static class ExprTreeHelper
 
             return (callExpr, GetSignatureOf(parameterArray));
         }
-        throw new MissingMethodException($"No method match argument signature {parameterArray}");
+
+        var candidateMethodsArgList = methods.Select(m =>
+            string.Join(',', m.Item1.GetParameters()
+                .Where(p => p.ParameterType != typeof(AsExecutionContext))
+                .Select(p => $"{p.ParameterType.Name}")));
+        
+        var candidateMethodsArgs = string.Join('\n', candidateMethodsArgList);
+        
+        var incomingArgs = string.Join(',', parameterArray
+            .Where(t => t != typeof(AsExecutionContext))
+            .Select(t => t.Name));
+        throw new MissingMethodException($"No method match arguments signature: {incomingArgs}\nCandidates:\n{candidateMethodsArgs}");
 
     }
 

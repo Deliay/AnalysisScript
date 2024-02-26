@@ -10,7 +10,7 @@ public static class ScriptParser
 {
     private static bool Is(this IEnumerator<IToken> reader, params TokenType[] types)
     {
-        return types.Any(type => type == reader.Current.Type);
+        return types.Any(type => type == reader.Current?.Type);
     }
 
     private static bool MoveNextAndIs(this IEnumerator<IToken> reader, params TokenType[] types)
@@ -210,7 +210,7 @@ public static class ScriptParser
     {
         reader.MoveNextAndRequire(TokenType.Let, TokenType.Comment, TokenType.Call, TokenType.NewLine, TokenType.Return,
             TokenType.Param);
-        while (true)
+        while (reader.Current is not null)
         {
             
             if (reader.Current.Type == TokenType.Comment)
@@ -252,7 +252,7 @@ public static class ScriptParser
 
     public static AsAnalysis? Parse(IEnumerable<IToken> tokens)
     {
-        var reader = tokens.GetEnumerator();
+        using var reader = tokens.GetEnumerator();
 
         var commands = ReadCommands(reader).ToList();
 
