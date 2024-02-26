@@ -479,16 +479,16 @@ public static class BasicFunctionV2
     }
 
     [AsMethod(Name = "days")]
-    public static TimeSpan Days(AsExecutionContext ctx, long duration) => TimeSpan.FromDays(duration);
+    public static TimeSpan Days(AsExecutionContext ctx, int duration) => TimeSpan.FromDays(duration);
     
     [AsMethod(Name = "hours")]
-    public static TimeSpan Hours(AsExecutionContext ctx, long duration) => TimeSpan.FromHours(duration);
+    public static TimeSpan Hours(AsExecutionContext ctx, int duration) => TimeSpan.FromHours(duration);
     
     [AsMethod(Name = "minutes")]
-    public static TimeSpan Minutes(AsExecutionContext ctx, long duration) => TimeSpan.FromMinutes(duration);
+    public static TimeSpan Minutes(AsExecutionContext ctx, int duration) => TimeSpan.FromMinutes(duration);
     
     [AsMethod(Name = "seconds")]
-    public static TimeSpan Seconds(AsExecutionContext ctx, long duration) => TimeSpan.FromSeconds(duration);
+    public static TimeSpan Seconds(AsExecutionContext ctx, int duration) => TimeSpan.FromSeconds(duration);
     
     [AsMethod(Name = "add")]
     public static DateTime Add(AsExecutionContext ctx, DateTime time, TimeSpan timeSpan) => time.Add(timeSpan);
