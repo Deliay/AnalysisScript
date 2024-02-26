@@ -9,7 +9,7 @@ public class VariableMap : IEnumerable<KeyValuePair<AsIdentity, IContainer>>
 {
     private readonly Dictionary<AsIdentity, IContainer> _varMap = [];
     private readonly Dictionary<string, AsIdentity> _nameMap = [];
-
+    
     public void Add(AsIdentity id, IContainer container)
     {
         _varMap.Add(id, container);

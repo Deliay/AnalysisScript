@@ -267,13 +267,13 @@ public static class BasicFunctionV2
 
     [AsMethod(Name = "group")]
     [AsMethod(Name = "distinct")]
-    public static HashSet<T> Group<T>(AsExecutionContext ctx, IEnumerable<T> values)
-        => values.ToHashSet();
+    public static IEnumerable<T> Group<T>(AsExecutionContext ctx, IEnumerable<T> values)
+        => values.Distinct();
 
     [AsMethod(Name = "group")]
     [AsMethod(Name = "distinct")]
-    public static async ValueTask<HashSet<T>> Group<T>(AsExecutionContext ctx, IAsyncEnumerable<T> values)
-        => await values.ToHashSetAsync();
+    public static IAsyncEnumerable<T> Group<T>(AsExecutionContext ctx, IAsyncEnumerable<T> values)
+        => values.Distinct();
 
     [AsMethod(Name = "limit")]
     [AsMethod(Name = "take")]

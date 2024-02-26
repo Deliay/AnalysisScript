@@ -21,7 +21,7 @@ public class AsIdentity(Token.Identity lexicalToken) : AsObject<Token.Identity>(
         if (obj is AsIdentity target)
             return target.Name == Name;
         else
-            return base.Equals(obj);
+            return ReferenceEquals(this, obj);
     }
 
     public static readonly AsIdentity Reference = new(new Token.Identity("&", 0, 0));
