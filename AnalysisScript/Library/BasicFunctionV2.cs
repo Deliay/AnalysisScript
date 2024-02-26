@@ -310,20 +310,39 @@ public static class BasicFunctionV2
         source.TakeLast(count);
 
     [AsMethod(Name = "not_null")]
-    public static T ThrowIfNull<T>(AsExecutionContext ctx, T instance) =>
-        instance ?? throw new NullReferenceException();
+    public static T ThrowIfNull<T>(AsExecutionContext ctx, T instance, string msg) =>
+        instance ?? throw new NullReferenceException(msg);
 
     [AsMethod(Name = "not_empty")]
-    public static IEnumerable<T> ThrowIfEmpty<T>(AsExecutionContext ctx, IEnumerable<T> instance) =>
-        instance.Any() ? instance : throw new NullReferenceException();
+    public static IEnumerable<T> ThrowIfEmpty<T>(AsExecutionContext ctx, IEnumerable<T> instance, string msg) =>
+        instance.Any() ? instance : throw new NullReferenceException(msg);
 
     [AsMethod(Name = "not_empty")]
     public static async ValueTask<IAsyncEnumerable<T>> ThrowIfEmpty<T>(AsExecutionContext ctx,
-        IAsyncEnumerable<T> instance) => await instance.AnyAsync() ? instance : throw new NullReferenceException();
+        IAsyncEnumerable<T> instance, string msg) => await instance.AnyAsync(ctx.CancelToken)
+        ? instance : throw new NullReferenceException(msg);
+
+    [AsMethod(Name = "not_empty")]
+    public static string ThrowIfEmptyString(AsExecutionContext ctx, string instance, string msg) =>
+        instance.Length != 0 ? instance : throw new NullReferenceException(msg);
+    
+    [AsMethod(Name = "not_null")]
+    public static T ThrowIfNull<T>(AsExecutionContext ctx, T instance) =>
+        ThrowIfNull(ctx, instance, $"{ctx.CurrentExecuteObject?.LexicalToken.Line.ToString() ?? typeof(T).Name} can not be null");
+
+    [AsMethod(Name = "not_empty")]
+    public static IEnumerable<T> ThrowIfEmpty<T>(AsExecutionContext ctx, IEnumerable<T> instance) =>
+        ThrowIfEmpty(ctx, instance, $"{ctx.CurrentExecuteObject?.LexicalToken.Line.ToString() ?? typeof(T).Name} can not be empty");
+
+    [AsMethod(Name = "not_empty")]
+    public static ValueTask<IAsyncEnumerable<T>> ThrowIfEmpty<T>(AsExecutionContext ctx,
+        IAsyncEnumerable<T> instance) => ThrowIfEmpty(ctx, instance,
+        $"{ctx.CurrentExecuteObject?.LexicalToken.Line.ToString() ?? typeof(T).Name} can not be empty");
 
     [AsMethod(Name = "not_empty")]
     public static string ThrowIfEmptyString(AsExecutionContext ctx, string instance) =>
-        instance.Length != 0 ? instance : throw new NullReferenceException();
+        ThrowIfEmptyString(ctx, instance,
+            $"{ctx.CurrentExecuteObject?.LexicalToken.Line.ToString() ?? "string"} can not be empty");
 
     [AsMethod(Name = "format")]
     public static string Format(AsExecutionContext ctx, string format)
