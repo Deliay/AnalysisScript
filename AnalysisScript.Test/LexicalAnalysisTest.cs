@@ -135,6 +135,16 @@ public class LexicalAnalysisTest
         Assert.Equal(2, collection.Count);
     }
     [Fact]
+    public void CanResolveNegativeRealNumber()
+    {
+        const double num = -1234.567;
+        var tokens = LexicalAnalyzer.Analyze($"{num}");
+        var collection = tokens.ToList();
+        Assert.Contains(collection, token => token.Type == TokenType.Number);
+        Assert.Equal(num, collection.Cast<Token.Number>().First().Real);
+        Assert.Equal(2, collection.Count);
+    }
+    [Fact]
     public void CanResolveIdentity()
     {
         const string id = "CanResolveIdentity";
@@ -268,7 +278,7 @@ public class LexicalAnalysisTest
     [Fact]
     public void CanSkipSpace()
     {
-        var tokens = LexicalAnalyzer.Analyze("|            \"123\"\n#123\n123").ToList();
+        var tokens = LexicalAnalyzer.Analyze("|            \"123.45\"\n#123\n-123").ToList();
         Assert.All(tokens, (token, i) =>
         {
             switch (i)
