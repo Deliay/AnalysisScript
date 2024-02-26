@@ -5,8 +5,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using AnalysisScript.Interpreter.Variables;
-using AnalysisScript.Lexical;
-using AnalysisScript.Parser.Ast.Basic;
 using Json.Path;
 
 namespace AnalysisScript.Library;
