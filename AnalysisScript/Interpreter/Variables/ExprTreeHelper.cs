@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
+using AnalysisScript.Interpreter.Variables.Method;
 
 namespace AnalysisScript.Interpreter.Variables;
 
@@ -544,6 +545,35 @@ public static class ExprTreeHelper
         return true;
     }
 
+    private static readonly MethodInfo EmptySequenceMethod = ToDelegate(Enumerable.Empty<int>).Method
+        .GetGenericMethodDefinition();
+
+    private static readonly MethodInfo EmptyAsyncSeqMethod = ToDelegate(AsyncEnumerable.Empty<int>).Method
+        .GetGenericMethodDefinition();
+
+    private static readonly Dictionary<Type, Func<object>> EmptySequenceCache = [];
+    public static object? MakeEmptyEnumerable(Type sequenceType)
+    {
+        if (!sequenceType.IsGenericType) return null;
+        
+        var genericType = sequenceType.GetGenericTypeDefinition();
+        var isSeq = genericType == typeof(IEnumerable<>);
+        var isAsyncSeq = genericType == typeof(IAsyncEnumerable<>);
+        if (!isSeq && !isAsyncSeq) return null;
+        
+        if (EmptySequenceCache.TryGetValue(sequenceType, out var lambda)) return lambda();
+                
+        var rawMethod = isAsyncSeq ? EmptyAsyncSeqMethod : EmptySequenceMethod;
+        var seqMethod = rawMethod.MakeGenericMethod(sequenceType.GetGenericArguments()[0]);
+        var callExpr = Expression.Call(null, seqMethod);
+        var objExpr = Expression.Convert(callExpr, typeof(object));
+        lambda = Expression.Lambda<Func<object>>(objExpr).Compile();
+        EmptySequenceCache.Add(sequenceType, lambda);
+
+        return lambda();
+
+    }
+
     public static (MethodCallExpression, string) BuildMethod(List<(MethodInfo, ConstantExpression?)> methods, IEnumerable<Type> parameters)
     {
         var parameterArray = parameters.ToList();
@@ -565,17 +595,7 @@ public static class ExprTreeHelper
             return (callExpr, GetSignatureOf(parameterArray));
         }
 
-        var candidateMethodsArgList = methods.Select(m =>
-            string.Join(',', m.Item1.GetParameters()
-                .Where(p => p.ParameterType != typeof(AsExecutionContext))
-                .Select(p => $"{p.ParameterType.Name}")));
-        
-        var candidateMethodsArgs = string.Join('\n', candidateMethodsArgList);
-        
-        var incomingArgs = string.Join(',', parameterArray
-            .Where(t => t != typeof(AsExecutionContext))
-            .Select(t => t.Name));
-        throw new MissingMethodException($"No method match arguments signature: {incomingArgs}\nCandidates:\n{candidateMethodsArgs}");
+        throw new NoMethodMatchedException(parameterArray, methods);
 
     }
 
