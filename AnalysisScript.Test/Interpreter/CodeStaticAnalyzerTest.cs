@@ -288,11 +288,18 @@ public class CodeStaticAnalyzerTest
         Assert.Equal(typeof(string).MakeArrayType(), line3Type);
     }
     [Fact]
-    public void TestLetPipesForEachWithoutErrors()
+    public void TestLetPipesForEachWithBoundVariableWithoutErrors()
     {
         const string source =
             """
             let a = ["1,2", "3,4"]
+            ||* split & ","
+            | flat
+            | distinct
+            | take 1
+            | join ","
+            
+            let b = [a, "3,4"]
             ||* split & ","
             | flat
             | distinct
@@ -319,4 +326,6 @@ public class CodeStaticAnalyzerTest
         var (_, line6Type) = Assert.Single(analyzer.VariableTypes.Where(p => p.Key.LexicalToken.Line == 6));
         Assert.Equal(aType, line6Type);
     }
+    
+    
 }

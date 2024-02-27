@@ -58,7 +58,7 @@ public class CodeStaticAnalyzer(VariableContext previewContext)
         return type;
     }
     
-    private static (int, Exception? e) PreviewCallInterpreter(VariableContext vars, AsExecutionContext ctx, AsCall asCall)
+    private (int, Exception? e) PreviewCallInterpreter(VariableContext vars, AsExecutionContext ctx, AsCall asCall)
     {
         if (!vars.Methods.HasMethod(asCall.Method.Name))
         {
@@ -69,7 +69,7 @@ public class CodeStaticAnalyzer(VariableContext previewContext)
 
         try
         {
-            vars.BuildMethod(null, asCall.Method.Name, asCall.Args);
+            vars.BuildMethod(null, asCall.Method.Name, asCall.Args, id => _varMap[id]);
             return (0, null);
         }
         catch (MissingMethodException e)
@@ -82,7 +82,7 @@ public class CodeStaticAnalyzer(VariableContext previewContext)
         }
     }
     
-    private static (Type returnType, Exception? e) PreviewPipeRunning(AsExecutionContext ctx, VariableContext vars, Type refType, AsPipe asPipe)
+    private (Type returnType, Exception? e) PreviewPipeRunning(AsExecutionContext ctx, VariableContext vars, Type refType, AsPipe asPipe)
     {
         if (!vars.Methods.HasMethod(asPipe.FunctionName.Name))
         {
@@ -105,13 +105,14 @@ public class CodeStaticAnalyzer(VariableContext previewContext)
                         new AsRuntimeException(ctx, null!, AsRuntimeError.NotEnumerable));
                 
                 var rawType = UnwrapAsyncType(enumerableType.GetGenericArguments()[0]);
-                var method = vars.BuildMethod(asPipe.DontSpreadArg ? null : rawType, asPipe.FunctionName.Name, asPipe.Arguments, () => rawType);
+                var method = vars.BuildMethod(asPipe.DontSpreadArg ? null : rawType, asPipe.FunctionName.Name, asPipe.Arguments, 
+                    id => _varMap[id], () => rawType);
 
                 return (typeof(IAsyncEnumerable<>).MakeGenericType(UnwrapAsyncType(method.ReturnType)), null);
             }
             else
             {
-                var method = vars.BuildMethod(previousValue, asPipe.FunctionName.Name, asPipe.Arguments, null);
+                var method = vars.BuildMethod(previousValue, asPipe.FunctionName.Name, asPipe.Arguments, id => _varMap[id], null);
                 
                 return (UnwrapAsyncType(method.ReturnType), null!);
             }
