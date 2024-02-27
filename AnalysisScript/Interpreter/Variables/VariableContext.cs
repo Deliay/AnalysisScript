@@ -191,20 +191,33 @@ public class VariableContext(MethodContext methods)
         }
     }
 
-    public IEnumerable<Type> ArgTypes(IEnumerable<AsObject> arguments, Type? thisType, Func<Type>? referenceType = default)
+    public IEnumerable<Type> ArgTypes(IEnumerable<AsObject> arguments, Type? thisType, 
+        Func<AsIdentity, Type>? idMapper = default, Func<Type>? referenceType = default)
     {
         yield return typeof(AsExecutionContext);
         if (thisType is not null) yield return thisType;
         foreach (var arg in arguments)
         {
-            yield return TypeOf(arg, referenceType);
+            if (idMapper is null) yield return TypeOf(arg, referenceType);
+            else yield return TypeOf(arg, idMapper, referenceType);
         }
+    }
+    public IEnumerable<Type> ArgTypes(IEnumerable<AsObject> arguments, Type? thisType, Func<Type>? referenceType = default)
+    {
+        return ArgTypes(arguments, thisType, null, referenceType);
+    }
+
+    public MethodInfo BuildMethod(
+        Type? thisType, string name, IEnumerable<AsObject> methodParams, 
+        Func<AsIdentity, Type>? idMapper = default, Func<Type>? referenceType = default)
+    {
+        return Methods.GetMethod(thisType, name, ArgTypes(methodParams, thisType, idMapper, referenceType)).Method;
     }
 
     public MethodInfo BuildMethod(
         Type? thisType, string name, IEnumerable<AsObject> methodParams, Func<Type>? referenceType = default)
     {
-        return Methods.GetMethod(thisType, name, ArgTypes(methodParams, thisType, referenceType)).Method;
+        return BuildMethod(thisType, name, methodParams, null, referenceType);
     }
 
     public Expression<Func<ValueTask<IContainer>>> GetMethodCallLambda(
