@@ -327,5 +327,48 @@ public class CodeStaticAnalyzerTest
         Assert.Equal(aType, line6Type);
     }
     
+    [Fact]
+    public void TestLetPipesCanResolveLambdaExprReturnValue()
+    {
+        const string source =
+            """
+            let a = ["123"]
+            | select "Length"
+
+            """;
+        var context = GenerateContext();
+        var analyzer = new CodeStaticAnalyzer(context);
+        var result = analyzer.PreviewErrors(source);
+
+        Assert.Empty(result);
+
+        var aType = analyzer.VariableTypes[new AsIdentity(new Token.Identity("a", 0, 0))];
+        Assert.Equal(typeof(IEnumerable<int>), aType);
+        var (_, line2Type) = Assert.Single(analyzer.VariableTypes.Where(p => p.Key.LexicalToken.Line == 2));
+        Assert.Equal(typeof(IEnumerable<int>), line2Type);
+    }
     
+    [Fact]
+    public void TestLetPipesCanResolveForEachLambdaExprReturnValue()
+    {
+        const string source =
+            """
+            let a = [["123"], ["456"]]
+            |* select "Length"
+            | flat
+
+            """;
+        var context = GenerateContext();
+        var analyzer = new CodeStaticAnalyzer(context);
+        var result = analyzer.PreviewErrors(source);
+
+        Assert.Empty(result);
+
+        var aType = analyzer.VariableTypes[new AsIdentity(new Token.Identity("a", 0, 0))];
+        Assert.Equal(typeof(IAsyncEnumerable<int>), aType);
+        var (_, line2Type) = Assert.Single(analyzer.VariableTypes.Where(p => p.Key.LexicalToken.Line == 2));
+        Assert.Equal(typeof(IAsyncEnumerable<IEnumerable<int>>), line2Type);
+        var (_, line3Type) = Assert.Single(analyzer.VariableTypes.Where(p => p.Key.LexicalToken.Line == 3));
+        Assert.Equal(typeof(IAsyncEnumerable<int>), line3Type);
+    }
 }

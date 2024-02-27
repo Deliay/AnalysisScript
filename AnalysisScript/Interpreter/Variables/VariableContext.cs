@@ -207,11 +207,18 @@ public class VariableContext(MethodContext methods)
         return ArgTypes(arguments, thisType, null, referenceType);
     }
 
+    public MethodCallExpression BuildMethodCallExpr(
+        Type? thisType, string name, IEnumerable<AsObject> methodParams, 
+        Func<AsIdentity, Type>? idMapper = default, Func<Type>? referenceType = default)
+    {
+        return Methods.GetMethod(thisType, name, ArgTypes(methodParams, thisType, idMapper, referenceType));
+    }
+    
     public MethodInfo BuildMethod(
         Type? thisType, string name, IEnumerable<AsObject> methodParams, 
         Func<AsIdentity, Type>? idMapper = default, Func<Type>? referenceType = default)
     {
-        return Methods.GetMethod(thisType, name, ArgTypes(methodParams, thisType, idMapper, referenceType)).Method;
+        return BuildMethodCallExpr(thisType, name, methodParams, idMapper, referenceType).Method;
     }
 
     public MethodInfo BuildMethod(
