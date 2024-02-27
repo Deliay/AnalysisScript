@@ -8,4 +8,5 @@ public enum AsRuntimeError
     VariableAlreadyExist,
     NotEnumerable,
     NoMatchedMethod,
+    NotAnalyzable,
 }
