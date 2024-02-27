@@ -568,9 +568,10 @@ public static class ExprTreeHelper
         var callExpr = Expression.Call(null, seqMethod);
         var objExpr = Expression.Convert(callExpr, typeof(object));
         lambda = Expression.Lambda<Func<object>>(objExpr).Compile();
+        var result = lambda();
         EmptySequenceCache.Add(sequenceType, lambda);
 
-        return lambda();
+        return result;
 
     }
 
