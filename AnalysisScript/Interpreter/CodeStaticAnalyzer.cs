@@ -1,3 +1,5 @@
+using System.Linq.Expressions;
+using System.Reflection;
 using AnalysisScript.Interpreter.Variables;
 using AnalysisScript.Interpreter.Variables.Method;
 using AnalysisScript.Lexical;
@@ -57,6 +59,50 @@ public class CodeStaticAnalyzer(VariableContext previewContext)
 
         return type;
     }
+
+    private static IEnumerable<object?> ResolveArgs(IEnumerable<AsObject> args)
+    {
+        yield return null;
+        yield return null;
+        foreach (var asObject in args)
+        {
+            yield return asObject switch
+            {
+                AsString str => str.RawContent,
+                AsInteger i => i.Value,
+                AsNumber n => n.Real,
+                _ => null,
+            };
+        }
+    }
+    
+    private static Type UnwrapExprReturnValue(MethodCallExpression callExpr, IEnumerable<AsObject> args)
+    {
+        var method = callExpr.Method;
+        if (method.ReturnType != typeof(LambdaExpression))
+        {
+            return method.ReturnType;
+        }
+
+        var paramList = callExpr.Arguments.Select(t => t as ParameterExpression ?? Expression.Parameter(t.Type)).ToList();
+        var @delegate = Expression.Lambda(callExpr, paramList).Compile();
+        var realArgs = ResolveArgs(args);
+
+        try
+        {
+            var objects = realArgs.ToArray();
+            var ret = @delegate.DynamicInvoke(objects);
+            if (ret is LambdaExpression lambdaExpression)
+            {
+                return lambdaExpression.ReturnType;
+            }
+        }
+        catch
+        {
+            // ignored
+        }
+        return method.ReturnType;
+    }
     
     private (int, Exception? e) PreviewCallInterpreter(VariableContext vars, AsExecutionContext ctx, AsCall asCall)
     {
@@ -69,7 +115,7 @@ public class CodeStaticAnalyzer(VariableContext previewContext)
 
         try
         {
-            vars.BuildMethod(null, asCall.Method.Name, asCall.Args, id => _varMap[id]);
+            vars.BuildMethodCallExpr(null, asCall.Method.Name, asCall.Args, id => _varMap[id]);
             return (0, null);
         }
         catch (MissingMethodException e)
@@ -105,16 +151,18 @@ public class CodeStaticAnalyzer(VariableContext previewContext)
                         new AsRuntimeException(ctx, null!, AsRuntimeError.NotEnumerable));
                 
                 var rawType = UnwrapAsyncType(enumerableType.GetGenericArguments()[0]);
-                var method = vars.BuildMethod(asPipe.DontSpreadArg ? null : rawType, asPipe.FunctionName.Name, asPipe.Arguments, 
+                var callExpr = vars.BuildMethodCallExpr(asPipe.DontSpreadArg ? null : rawType, asPipe.FunctionName.Name, asPipe.Arguments, 
                     id => _varMap[id], () => rawType);
+                var returnType = UnwrapExprReturnValue(callExpr, asPipe.Arguments);
 
-                return (typeof(IAsyncEnumerable<>).MakeGenericType(UnwrapAsyncType(method.ReturnType)), null);
+                return (typeof(IAsyncEnumerable<>).MakeGenericType(UnwrapAsyncType(returnType)), null);
             }
             else
             {
-                var method = vars.BuildMethod(previousValue, asPipe.FunctionName.Name, asPipe.Arguments, id => _varMap[id], null);
+                var callExpr = vars.BuildMethodCallExpr(previousValue, asPipe.FunctionName.Name, asPipe.Arguments, id => _varMap[id], null);
+                var returnType = UnwrapExprReturnValue(callExpr, asPipe.Arguments);
                 
-                return (UnwrapAsyncType(method.ReturnType), null!);
+                return (UnwrapAsyncType(returnType), null!);
             }
         }
         catch (UnknownMethodException e)
