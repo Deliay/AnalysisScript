@@ -46,6 +46,10 @@ public class CodeStaticAnalyzer(VariableContext previewContext)
         }
     }
 
+    public IReadOnlyDictionary<AsCall, MethodInfo> CallsMethod => _callsMethod;
+    private readonly Dictionary<AsCall, MethodInfo> _callsMethod = [];
+    public IReadOnlyDictionary<AsPipe, MethodInfo> PipesMethod => _pipesMethod;
+    private readonly Dictionary<AsPipe, MethodInfo> _pipesMethod = [];
     private readonly Dictionary<AsIdentity, Type> _varMap = [];
     public IReadOnlyDictionary<AsIdentity, Type> VariableTypes => _varMap;
     public Type? ReturnType { get; private set; }
@@ -115,7 +119,8 @@ public class CodeStaticAnalyzer(VariableContext previewContext)
 
         try
         {
-            vars.BuildMethodCallExpr(null, asCall.Method.Name, asCall.Args, id => _varMap[id]);
+            var method = vars.BuildMethodCallExpr(null, asCall.Method.Name, asCall.Args, id => _varMap[id]);
+            _callsMethod.Add(asCall, method.Method);
             return (0, null);
         }
         catch (NoMethodMatchedException e)
@@ -154,6 +159,8 @@ public class CodeStaticAnalyzer(VariableContext previewContext)
                 var callExpr = vars.BuildMethodCallExpr(asPipe.DontSpreadArg ? null : rawType, asPipe.FunctionName.Name, asPipe.Arguments, 
                     id => _varMap[id], () => rawType);
                 var returnType = UnwrapExprReturnValue(ctx, callExpr, asPipe.Arguments);
+                
+                _pipesMethod.Add(asPipe, callExpr.Method);
 
                 return (typeof(IAsyncEnumerable<>).MakeGenericType(UnwrapAsyncType(returnType)), null);
             }
@@ -162,6 +169,7 @@ public class CodeStaticAnalyzer(VariableContext previewContext)
                 var callExpr = vars.BuildMethodCallExpr(previousValue, asPipe.FunctionName.Name, asPipe.Arguments, id => _varMap[id], null);
                 var returnType = UnwrapExprReturnValue(ctx, callExpr, asPipe.Arguments);
                 
+                _pipesMethod.Add(asPipe, callExpr.Method);
                 return (UnwrapAsyncType(returnType), null!);
             }
         }
@@ -271,6 +279,8 @@ public class CodeStaticAnalyzer(VariableContext previewContext)
     public IEnumerable<(int, ErrorTypes, Exception)> PreviewErrors<TReturn>(string code)
     {
         _varMap.Clear();
+        _pipesMethod.Clear();
+        _callsMethod.Clear();
         ReturnType = null;
         var (result, lexicalException) = PreviewLexicalAnalyze(code);
         if (lexicalException is not null)
