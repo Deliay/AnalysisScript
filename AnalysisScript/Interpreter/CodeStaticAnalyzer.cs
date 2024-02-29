@@ -20,7 +20,7 @@ public class CodeStaticAnalyzer(VariableContext previewContext)
         Runtime,
     }
 
-    private static (IEnumerable<IToken> result, Exception? e) PreviewLexicalAnalyze(string code)
+    private static (List<IToken> result, Exception? e) PreviewLexicalAnalyze(string code)
     {
         try
         {
@@ -52,6 +52,9 @@ public class CodeStaticAnalyzer(VariableContext previewContext)
     private readonly Dictionary<AsPipe, MethodInfo> _pipesMethod = [];
     private readonly Dictionary<AsIdentity, Type> _varMap = [];
     public IReadOnlyDictionary<AsIdentity, Type> VariableTypes => _varMap;
+    private List<IToken> _lexicalTokens = [];
+    private IReadOnlyList<IToken> LexicalTokens => _lexicalTokens;
+    public AsAnalysis? SyntaxTree { get; private set; }
     public Type? ReturnType { get; private set; }
     private static Type UnwrapAsyncType(Type type)
     {
@@ -291,7 +294,8 @@ public class CodeStaticAnalyzer(VariableContext previewContext)
             yield return (invalidTokenException.Line, ErrorTypes.Lexical, lexicalException);
             yield break;
         }
-        
+
+        this._lexicalTokens = result;
         var (ast, parseException) = PreviewParse(result);
         if (parseException is not null)
         {
@@ -302,9 +306,11 @@ public class CodeStaticAnalyzer(VariableContext previewContext)
             yield break;
         }
 
+        this.SyntaxTree = ast;
         foreach (var (line, ex) in PreviewInterpreter<TReturn>(previewContext, ast))
         {
             yield return (line, ErrorTypes.Runtime, ex);
         }
     }
+
 }
