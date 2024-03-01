@@ -81,33 +81,3 @@ let e = "string ${c} interpolation"
 return d
 ```
 
-## Grammars
-```
-param -> identity
-
-arr -> param
-
-arrs -> '[' arrs arr ',' | empty ']'
-
-argument -> number | string | identity | arrs
-
-arguments -> arguments argument
-
-pipe -> pipe identity argument newline
-
-pipes -> pipes pipe | empty
-
-variable -> identity
-
-let -> let variable = argument [pipes]
-
-call -> call identity argument
-
-cmd -> let | call | comment | param
-
-return -> return identity
-
-cmds -> cmds cmd | empty
-
-analysis -> cmds return
-```
