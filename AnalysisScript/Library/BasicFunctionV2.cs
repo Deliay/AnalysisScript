@@ -1,4 +1,5 @@
-﻿using AnalysisScript.Interpreter;
+﻿using System.Diagnostics.CodeAnalysis;
+using AnalysisScript.Interpreter;
 using System.Linq.Expressions;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -16,7 +17,7 @@ public static class BasicFunctionV2
     {
         if (!RegexCache.TryGetValue(regexStr, out var regex))
         {
-            RegexCache.Add(regexStr, regex = new Regex(regexStr));
+            RegexCache.Add(regexStr, regex = new Regex(regexStr, RegexOptions.Compiled));
         }
 
         return regex;
@@ -40,7 +41,7 @@ public static class BasicFunctionV2
         var thisParam = ExprTreeHelper.GetConstantValueLambda(@this);
 
         var mapperMethod = Expression.Lambda(property, param);
-        var selectMethod = ExprTreeHelper.ConstructSelectMethod(typeof(IEnumerable<>), typeof(T), property.Type);
+        var selectMethod = ExprTreeHelper.ConstructSelectMethod(typeof(IEnumerable<>), typeof(T), property.Type, forceSync: true);
 
         var callSelect = Expression.Call(null, selectMethod, thisParam, mapperMethod);
 
@@ -266,13 +267,13 @@ public static class BasicFunctionV2
 
     [AsMethod(Name = "group")]
     [AsMethod(Name = "distinct")]
-    public static HashSet<T> Group<T>(AsExecutionContext ctx, IEnumerable<T> values)
-        => values.ToHashSet();
+    public static IEnumerable<T> Group<T>(AsExecutionContext ctx, IEnumerable<T> values)
+        => values.Distinct();
 
     [AsMethod(Name = "group")]
     [AsMethod(Name = "distinct")]
-    public static async ValueTask<HashSet<T>> Group<T>(AsExecutionContext ctx, IAsyncEnumerable<T> values)
-        => await values.ToHashSetAsync();
+    public static IAsyncEnumerable<T> Group<T>(AsExecutionContext ctx, IAsyncEnumerable<T> values)
+        => values.Distinct();
 
     [AsMethod(Name = "limit")]
     [AsMethod(Name = "take")]
@@ -307,20 +308,39 @@ public static class BasicFunctionV2
         source.TakeLast(count);
 
     [AsMethod(Name = "not_null")]
-    public static T ThrowIfNull<T>(AsExecutionContext ctx, T instance) =>
-        instance ?? throw new NullReferenceException();
+    public static T ThrowIfNull<T>(AsExecutionContext ctx, T instance, string msg) =>
+        instance ?? throw new NullReferenceException(msg);
 
     [AsMethod(Name = "not_empty")]
-    public static IEnumerable<T> ThrowIfEmpty<T>(AsExecutionContext ctx, IEnumerable<T> instance) =>
-        instance.Any() ? instance : throw new NullReferenceException();
+    public static IEnumerable<T> ThrowIfEmpty<T>(AsExecutionContext ctx, IEnumerable<T> instance, string msg) =>
+        instance.Any() ? instance : throw new NullReferenceException(msg);
 
     [AsMethod(Name = "not_empty")]
     public static async ValueTask<IAsyncEnumerable<T>> ThrowIfEmpty<T>(AsExecutionContext ctx,
-        IAsyncEnumerable<T> instance) => await instance.AnyAsync() ? instance : throw new NullReferenceException();
+        IAsyncEnumerable<T> instance, string msg) => await instance.AnyAsync(ctx.CancelToken)
+        ? instance : throw new NullReferenceException(msg);
+
+    [AsMethod(Name = "not_empty")]
+    public static string ThrowIfEmptyString(AsExecutionContext ctx, string instance, string msg) =>
+        instance.Length != 0 ? instance : throw new NullReferenceException(msg);
+    
+    [AsMethod(Name = "not_null")]
+    public static T ThrowIfNull<T>(AsExecutionContext ctx, T instance) =>
+        ThrowIfNull(ctx, instance, $"{ctx.CurrentExecuteObject?.LexicalToken.Line.ToString() ?? typeof(T).Name} can not be null");
+
+    [AsMethod(Name = "not_empty")]
+    public static IEnumerable<T> ThrowIfEmpty<T>(AsExecutionContext ctx, IEnumerable<T> instance) =>
+        ThrowIfEmpty(ctx, instance, $"{ctx.CurrentExecuteObject?.LexicalToken.Line.ToString() ?? typeof(T).Name} can not be empty");
+
+    [AsMethod(Name = "not_empty")]
+    public static ValueTask<IAsyncEnumerable<T>> ThrowIfEmpty<T>(AsExecutionContext ctx,
+        IAsyncEnumerable<T> instance) => ThrowIfEmpty(ctx, instance,
+        $"{ctx.CurrentExecuteObject?.LexicalToken.Line.ToString() ?? typeof(T).Name} can not be empty");
 
     [AsMethod(Name = "not_empty")]
     public static string ThrowIfEmptyString(AsExecutionContext ctx, string instance) =>
-        instance.Length != 0 ? instance : throw new NullReferenceException();
+        ThrowIfEmptyString(ctx, instance,
+            $"{ctx.CurrentExecuteObject?.LexicalToken.Line.ToString() ?? "string"} can not be empty");
 
     [AsMethod(Name = "format")]
     public static string Format(AsExecutionContext ctx, string format)
@@ -332,6 +352,12 @@ public static class BasicFunctionV2
     public static IEnumerable<T> Flat<T>(AsExecutionContext ctx, IEnumerable<IEnumerable<T>> arrayList)
     {
         return arrayList.SelectMany(array => array);
+    }
+
+    [AsMethod(Name = "flat")]
+    public static IAsyncEnumerable<T> FlatAsync<T>(AsExecutionContext ctx, IEnumerable<IAsyncEnumerable<T>> arrayList)
+    {
+        return arrayList.ToAsyncEnumerable().SelectMany(array => array);
     }
 
     [AsMethod(Name = "flat")]
@@ -408,10 +434,18 @@ public static class BasicFunctionV2
 
     private static readonly Dictionary<string, JsonPath> JsonPathCaches = [];
 
+    private static JsonPath GetJsonPath(string path)
+    {
+        if (!JsonPathCaches.TryGetValue(path, out var jsonPath)) 
+            JsonPathCaches.Add(path, jsonPath = JsonPath.Parse(path));
+
+        return jsonPath;
+    }
+
     [AsMethod(Name = "json_path")]
     public static IEnumerable<JsonNode?> EvalJsonPath(AsExecutionContext ctx, JsonNode? json, string path)
     {
-        if (!JsonPathCaches.TryGetValue(path, out var jsonPath)) jsonPath = JsonPath.Parse(path);
+        var jsonPath = GetJsonPath(path);
 
         var result = jsonPath.Evaluate(json);
 
@@ -444,6 +478,102 @@ public static class BasicFunctionV2
         return EvalJsonPath(ctx, ToJsonNode(ctx, list), path);
     }
 
+    [AsMethod(Name = "days")]
+    public static TimeSpan Days(AsExecutionContext ctx, int duration) => TimeSpan.FromDays(duration);
+    
+    [AsMethod(Name = "hours")]
+    public static TimeSpan Hours(AsExecutionContext ctx, int duration) => TimeSpan.FromHours(duration);
+    
+    [AsMethod(Name = "minutes")]
+    public static TimeSpan Minutes(AsExecutionContext ctx, int duration) => TimeSpan.FromMinutes(duration);
+    
+    [AsMethod(Name = "seconds")]
+    public static TimeSpan Seconds(AsExecutionContext ctx, int duration) => TimeSpan.FromSeconds(duration);
+    
+    [AsMethod(Name = "add")]
+    public static DateTime Add(AsExecutionContext ctx, DateTime time, TimeSpan timeSpan) => time.Add(timeSpan);
+    
+    [AsMethod(Name = "add")]
+    public static DateTimeOffset Add(AsExecutionContext ctx, DateTimeOffset time, TimeSpan timeSpan) => time.Add(timeSpan);
+
+    [AsMethod(Name = "add")]
+    public static DateTimeOffset Add(AsExecutionContext ctx, TimeSpan timeSpan, DateTimeOffset time) => time.Add(timeSpan);
+
+    [AsMethod(Name = "eval")]
+    public static List<T> Eval<T>(AsExecutionContext ctx, IEnumerable<T> seq) => seq.ToList();
+
+    [AsMethod(Name = "eval")]
+    public static ValueTask<List<T>> Eval<T>(AsExecutionContext ctx, IAsyncEnumerable<T> seq) =>
+        seq.ToListAsync(ctx.CancelToken);
+
+    [AsMethod(Name = "regex_pluck")]
+    public static string? Pluck(AsExecutionContext ctx, string content, string regexStr, int index)
+    {
+        var regex = GetRegex(regexStr);
+        var match = regex.Match(content);
+        
+        if (!match.Success) return null;
+
+        return match.Groups[index].Success
+            ? match.Groups[index].Value
+            : null;
+    }
+    
+    [AsMethod(Name = "regex_pluck")]
+    public static IEnumerable<string> Pluck(AsExecutionContext ctx, IEnumerable<string> contents, string regexStr, int index)
+    {
+        var regex = GetRegex(regexStr);
+
+        foreach (var content in contents)
+        {
+            var match = regex.Match(content);
+
+            if (match.Success && match.Groups[index].Success)
+                yield return match.Groups[index].Value;
+        }
+    }
+    
+    [AsMethod(Name = "regex_pluck")]
+    public static async IAsyncEnumerable<string> PluckAsync(AsExecutionContext ctx, IAsyncEnumerable<string> contents, string regexStr, int index)
+    {
+        var regex = GetRegex(regexStr);
+
+        await foreach (var content in contents)
+        {
+            var match = regex.Match(content);
+
+            if (match.Success && match.Groups[index].Success)
+                yield return match.Groups[index].Value;
+        }
+    }
+
+    [AsMethod(Name = "regex_format")]
+    public static string? RegexFormat(AsExecutionContext ctx, string content, string regexStr, string format)
+    {
+        var regex = GetRegex(regexStr);
+        var replaceResult = regex.Replace(content, format);
+        return ReferenceEquals(replaceResult, content) ? null : replaceResult;
+    }
+
+    [AsMethod(Name = "regex_format")]
+    public static IEnumerable<string> RegexFormat(AsExecutionContext ctx, IEnumerable<string> content, 
+        string regexStr, string format)
+    {
+        return content
+            .Select(str => RegexFormat(ctx, str, regexStr, format))
+            .OfType<string>();
+    }
+    
+    [AsMethod(Name = "regex_format")]
+    public static IAsyncEnumerable<string> RegexFormatAsync(AsExecutionContext ctx, IAsyncEnumerable<string> content, 
+        string regexStr, string format)
+    {
+        return content
+            .Select(str => RegexFormat(ctx, str, regexStr, format))
+            .OfType<string>();
+    }
+
+    
     public static AsInterpreter RegisterBasicFunctionsV2(this AsInterpreter interpreter)
     {
         interpreter.Variables.Methods.ScanAndRegisterStaticFunction(typeof(BasicFunctionV2));

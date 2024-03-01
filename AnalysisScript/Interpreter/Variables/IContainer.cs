@@ -14,6 +14,18 @@ public interface IContainer
     public string? UnderlyingToString() => ExprTreeHelper.GetExprToStringDelegate(this);
 
     public object? BoxedUnderlyingValue() => ExprTreeHelper.GetBoxUnderlyingValueDelegate(this)();
+
+    public async ValueTask AwaitIfUnderlyingIsKnownAwaitable(CancellationToken cancellationToken = default)
+    {
+        if (UnderlyingType == typeof(Task) && As<Task>() is {} task)
+        {
+            await task.WaitAsync(cancellationToken);
+        }
+        else if (UnderlyingType == typeof(ValueTask))
+        {
+            await As<ValueTask>();
+        }
+    }
 }
 
 public readonly struct Container<T>(T? value) : IContainer

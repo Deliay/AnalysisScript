@@ -9,7 +9,7 @@ public class VariableMap : IEnumerable<KeyValuePair<AsIdentity, IContainer>>
 {
     private readonly Dictionary<AsIdentity, IContainer> _varMap = [];
     private readonly Dictionary<string, AsIdentity> _nameMap = [];
-
+    
     public void Add(AsIdentity id, IContainer container)
     {
         _varMap.Add(id, container);
@@ -21,6 +21,12 @@ public class VariableMap : IEnumerable<KeyValuePair<AsIdentity, IContainer>>
         var val = _varMap[newId];
         _varMap.Remove(newId);
         _varMap.Add(newId, val);
+    }
+
+    internal void Unset(AsIdentity id)
+    {
+        _varMap.Remove(id);
+        _nameMap.Remove(id.Name);
     }
 
     internal void UpdateReference(AsIdentity id, IContainer container)
@@ -49,4 +55,10 @@ public class VariableMap : IEnumerable<KeyValuePair<AsIdentity, IContainer>>
             && _varMap.TryGetValue(id, out container!);
     }
 
+    public void Clear()
+    {
+        _varMap.Clear();
+        _nameMap.Clear();
+    }
+    
 }

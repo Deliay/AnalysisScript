@@ -11,9 +11,16 @@ public class VariableContext(MethodContext methods)
     public IEnumerable<KeyValuePair<AsIdentity, IContainer>> AllVariables => _variables;
     private readonly VariableMap _variables = [];
     private int _tempVar = 0;
+
+    private Token.Identity GetNextTempLexicalVarId(IToken token) =>
+        new($"\"_temp_var_{++_tempVar}", token.Pos, token.Line);
+    
+    internal AsIdentity GetNextTempVar(IToken token) =>
+        new AsIdentity(GetNextTempLexicalVarId(token));
+    
     public AsIdentity AddTempVar(IContainer value, IToken token)
     {
-        var id = new AsIdentity(new Token.Identity($"\"_temp_var_{++_tempVar}", token.Pos, token.Line));
+        var id = GetNextTempVar(token);
         _variables.Add(id, value);
         return id;
     }
@@ -51,11 +58,16 @@ public class VariableContext(MethodContext methods)
         _variables.Add(id, value);
     }
 
-    internal void AddOrUpdateVariable(AsIdentity id, IContainer value)
+    public void AddOrUpdateVariable(AsIdentity id, IContainer value)
     {
         if (_variables.ContainsKey(id))
             _variables.UpdateReference(id, value);
         else _variables.Add(id, value);
+    }
+
+    public void Clear()
+    {
+        _variables.Clear();
     }
 
     public bool HasVariable(AsIdentity id) => _variables.ContainsKey(id);
@@ -102,9 +114,9 @@ public class VariableContext(MethodContext methods)
         };
     }
 
-    private Type PeekArrayType(AsArray array, Func<Type>? referenceType = default)
+    private Type PeekArrayType(AsArray array, Func<AsIdentity, Type> idMapper, Func<Type>? referenceType = default)
     {
-        return array.Items.Select(item => TypeOf(item, referenceType)).FirstOrDefault() ?? throw new InvalidDataException();
+        return array.Items.Select(item => TypeOf(item, idMapper, referenceType)).FirstOrDefault() ?? throw new InvalidDataException();
     }
     private IContainer BuildArray(AsArray array)
     {
@@ -136,19 +148,24 @@ public class VariableContext(MethodContext methods)
         }
     }
     
-    public Type TypeOf(AsObject @object, Func<Type>? referenceType = default)
+    public Type TypeOf(AsObject @object, Func<AsIdentity, Type> idMapper, Func<Type>? referenceType = default)
     {
         return @object switch
         {
             AsString => typeof(string),
-            AsInteger integer => typeof(int),
-            AsNumber num => typeof(double),
-            AsArray arr => PeekArrayType(arr, referenceType),
+            AsInteger => typeof(int),
+            AsNumber => typeof(double),
+            AsArray arr => PeekArrayType(arr, idMapper, referenceType).MakeArrayType(),
             AsIdentity id => referenceType is not null && id.Name == "&"
                 ? referenceType()
-                : GetVariableContainer(id).UnderlyingType,
+                : idMapper(id),
             _ => throw new UnknownValueObjectException(@object)
         };
+    }
+    public Type TypeOf(AsObject @object, Func<Type>? referenceType = default)
+    {
+        return TypeOf(@object, IdMapper, referenceType);
+        Type IdMapper(AsIdentity id) => GetVariableContainer(id).UnderlyingType;
     }
     public MethodCallExpression LambdaValueOf(AsObject @object)
     {
@@ -174,20 +191,40 @@ public class VariableContext(MethodContext methods)
         }
     }
 
-    private IEnumerable<Type> ArgTypes(IEnumerable<AsObject> arguments, Type? thisType, Func<Type>? referenceType = default)
+    public IEnumerable<Type> ArgTypes(IEnumerable<AsObject> arguments, Type? thisType, 
+        Func<AsIdentity, Type>? idMapper = default, Func<Type>? referenceType = default)
     {
         yield return typeof(AsExecutionContext);
         if (thisType is not null) yield return thisType;
         foreach (var arg in arguments)
         {
-            yield return TypeOf(arg, referenceType);
+            if (idMapper is null) yield return TypeOf(arg, referenceType);
+            else yield return TypeOf(arg, idMapper, referenceType);
         }
+    }
+    public IEnumerable<Type> ArgTypes(IEnumerable<AsObject> arguments, Type? thisType, Func<Type>? referenceType = default)
+    {
+        return ArgTypes(arguments, thisType, null, referenceType);
+    }
+
+    public MethodCallExpression BuildMethodCallExpr(
+        Type? thisType, string name, IEnumerable<AsObject> methodParams, 
+        Func<AsIdentity, Type>? idMapper = default, Func<Type>? referenceType = default)
+    {
+        return Methods.GetMethod(thisType, name, ArgTypes(methodParams, thisType, idMapper, referenceType));
+    }
+    
+    public MethodInfo BuildMethod(
+        Type? thisType, string name, IEnumerable<AsObject> methodParams, 
+        Func<AsIdentity, Type>? idMapper = default, Func<Type>? referenceType = default)
+    {
+        return BuildMethodCallExpr(thisType, name, methodParams, idMapper, referenceType).Method;
     }
 
     public MethodInfo BuildMethod(
         Type? thisType, string name, IEnumerable<AsObject> methodParams, Func<Type>? referenceType = default)
     {
-        return Methods.GetMethod(thisType, name, ArgTypes(methodParams, thisType, referenceType)).Method;
+        return BuildMethod(thisType, name, methodParams, null, referenceType);
     }
 
     public Expression<Func<ValueTask<IContainer>>> GetMethodCallLambda(

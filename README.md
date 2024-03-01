@@ -54,8 +54,8 @@ var result = await interpreter.RunAndReturn<string>();
 Console.WriteLine(result);
 ```
 
-### All grammar example
-```
+### All syntaxs example
+```powershell
 # define variable 'a'
 param a
 
@@ -81,33 +81,3 @@ let e = "string ${c} interpolation"
 return d
 ```
 
-## Grammar
-```
-param -> identity
-
-arr -> param
-
-arrs -> '[' arrs arr ',' | empty ']'
-
-argument -> number | string | identity | arrs
-
-arguments -> arguments argument
-
-pipe -> pipe identity argument newline
-
-pipes -> pipes pipe | empty
-
-variable -> identity
-
-let -> let variable = argument [pipes]
-
-ui -> ui newline pipes
-
-cmd -> let | ui | comment | param
-
-return -> return identity
-
-cmds -> cmds cmd | empty
-
-analysis -> cmds return
-```

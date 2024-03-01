@@ -24,16 +24,16 @@ public class LibraryTest
     }
     
     [Fact]
-    public async Task TestSelectEnumerable()
+    public void TestSelectEnumerable()
     {
         List<List<int>> test = [[1],[2]];
         var prop = nameof(test.Count);
         var lambda = BasicFunctionV2.SelectSequence(DefaultContext, test, prop);
 
-        var method = Expression.Lambda<Func<IAsyncEnumerable<int>>>(Expression.Invoke(lambda)).Compile();
+        var method = Expression.Lambda<Func<IEnumerable<int>>>(Expression.Invoke(lambda)).Compile();
 
         var result = method();
-        Assert.Equal(2, await result.SumAsync());
+        Assert.Equal(2, result.Sum());
     }
     [Fact]
     public async Task TestSelectAsyncEnumerable()
@@ -256,7 +256,7 @@ public class LibraryTest
     public void TestGroup()
     {
         IEnumerable<int> items = [1, 2, 1, 2];
-        var actual = BasicFunctionV2.Group(DefaultContext, items);
+        var actual = BasicFunctionV2.Group(DefaultContext, items).ToList();
         
         Assert.Equal(2, actual.Count);
         Assert.Equal(3, actual.Sum());
@@ -265,7 +265,8 @@ public class LibraryTest
     public async Task TestGroupAsync()
     {
         IEnumerable<int> items = [1, 2, 1, 2];
-        var actual = await BasicFunctionV2.Group(DefaultContext, items.ToAsyncEnumerable());
+        var actual = await BasicFunctionV2.Group(DefaultContext, items.ToAsyncEnumerable())
+            .ToListAsync();
         
         Assert.Equal(2, actual.Count);
         Assert.Equal(3, actual.Sum());
@@ -435,6 +436,18 @@ public class LibraryTest
     }
 
     [Fact]
+    public async Task TestFlatEnumInnerAsyncEnumAsync()
+    {
+        IEnumerable<int> seqA = [1, 2];
+        IEnumerable<int> seqB = [3, 4];
+        IEnumerable<IAsyncEnumerable<int>> seq = [seqA.ToAsyncEnumerable(), seqB.ToAsyncEnumerable()];
+
+        var actual = BasicFunctionV2.FlatAsync(DefaultContext, seq);
+        
+        Assert.Equal(10, await actual.SumAsync());
+    }
+
+    [Fact]
     public void TestListOf()
     {
         var actual = BasicFunctionV2.ListOf(DefaultContext, [1]);
@@ -596,5 +609,141 @@ public class LibraryTest
         var result = await BasicFunctionV2.EvalJsonPath(DefaultContext, list, "$[0].a");
         
         Assert.Equal(1, Assert.Single(result).GetValue<int>());
+    }
+
+    [Fact]
+    public void TestTimeSpanGenerator()
+    {
+        Assert.Equal(TimeSpan.FromSeconds(1), BasicFunctionV2.Seconds(DefaultContext, 1));
+        Assert.Equal(TimeSpan.FromMinutes(1), BasicFunctionV2.Minutes(DefaultContext, 1));
+        Assert.Equal(TimeSpan.FromHours(1), BasicFunctionV2.Hours(DefaultContext, 1));
+        Assert.Equal(TimeSpan.FromDays(1), BasicFunctionV2.Days(DefaultContext, 1));
+    }
+
+    [Fact]
+    public void TestDateTimeAdd()
+    {
+        var now = DateTime.Now;
+        var span = TimeSpan.FromDays(1);
+        Assert.Equal(now + span, BasicFunctionV2.Add(DefaultContext, now, span));
+    }
+
+    [Fact]
+    public void TestDateTimeOffsetAdd()
+    {
+        var now = DateTimeOffset.Now;
+        var span = TimeSpan.FromDays(1);
+        Assert.Equal(now + span, BasicFunctionV2.Add(DefaultContext, now, span));
+    }
+
+    [Fact]
+    public void TestDateTimeOffsetAdd2()
+    {
+        var now = DateTimeOffset.Now;
+        var span = TimeSpan.FromDays(1);
+        Assert.Equal(now + span, BasicFunctionV2.Add(DefaultContext, span, now));
+    }
+
+    [Fact]
+    public void TestCanEvalSequence()
+    {
+        IEnumerable<int> seq = [1];
+        Assert.Equal(1, Assert.Single(BasicFunctionV2.Eval(DefaultContext, seq)));
+    }
+    
+    [Fact]
+    public async Task TestCanEvalSequenceAsync()
+    {
+        IEnumerable<int> seq = [1];
+        var asyncSeq = seq.ToAsyncEnumerable();
+        Assert.Equal(1, Assert.Single(await BasicFunctionV2.Eval(DefaultContext, asyncSeq)));
+    }
+
+    [Fact]
+    public void TestPluckSingleElement()
+    {
+        var result = BasicFunctionV2.Pluck(DefaultContext, "rlt:1", @"rlt:(\d+)", 1);
+        
+        Assert.Equal("1", result);
+    }
+
+    [Fact]
+    public void TestPluckSingleElementReturnNullIfNotMatched()
+    {
+        var result = BasicFunctionV2.Pluck(DefaultContext, "rlt:a", @"rlt:(\d+)", 1);
+        
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void TestPluckManyElement()
+    {
+        var result = BasicFunctionV2.Pluck(DefaultContext, ["rlt:aa", "rlt:ab", "rlt:bb"], @"rlt:(a.)", 1);
+        
+        Assert.Equal("aa,ab", string.Join(',', result));
+    }
+
+    [Fact]
+    public async Task TestPluckManyElementAsync()
+    {
+        IEnumerable<string> items = ["rlt:aa", "rlt:ab", "rlt:bb"];
+        var result = await BasicFunctionV2
+            .PluckAsync(DefaultContext, items.ToAsyncEnumerable(), @"rlt:(a.)", 1)
+            .ToListAsync();
+        
+        Assert.Equal("aa,ab", string.Join(',', result));
+    }
+
+    [Fact]
+    public void TestRegexFormat()
+    {
+
+        var variables = new VariableContext();
+
+        var ctx = new AsExecutionContext(variables, null!, default);
+
+        var actual = BasicFunctionV2.RegexFormat(ctx, "123abc456", @"^(\d+)[a-z]+(\d+)", "$1$2");
+        
+        Assert.Equal("123456", actual);
+    }
+    [Fact]
+    public void TestRegexFormatReturnNullIfMatchFailed()
+    {
+
+        var variables = new VariableContext();
+
+        var ctx = new AsExecutionContext(variables, null!, default);
+
+        var actual = BasicFunctionV2.RegexFormat(ctx, "a123abc456", @"^(\d+)[a-z]+(\d+)", "$1$2");
+        
+        Assert.Null(actual);
+    }
+
+    [Fact]
+    public void TestRegexFormatMany()
+    {
+        var variables = new VariableContext();
+
+        var ctx = new AsExecutionContext(variables, null!, default);
+
+        IEnumerable<string> raw = ["123abc456", "abc123def"];
+        
+        var actual = BasicFunctionV2.RegexFormat(ctx, raw, @"^(\d+)[a-z]+(\d+)", "$1$2");
+        
+        Assert.Equal("123456", Assert.Single(actual));
+    }
+    [Fact]
+    public async Task TestRegexFormatManyAsync()
+    {
+        var variables = new VariableContext();
+
+        var ctx = new AsExecutionContext(variables, null!, default);
+
+        IEnumerable<string> raw = ["123abc456", "abc123def"];
+        
+        var actual = await BasicFunctionV2.RegexFormatAsync(ctx, raw.ToAsyncEnumerable(), @"^(\d+)[a-z]+(\d+)", "$1$2")
+            .ToListAsync();
+        
+        Assert.Equal("123456", Assert.Single(actual));
     }
 }

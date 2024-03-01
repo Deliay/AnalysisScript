@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
+using AnalysisScript.Interpreter.Variables.Method;
 
 namespace AnalysisScript.Interpreter.Variables;
 
@@ -21,13 +22,13 @@ public static class ExprTreeHelper
     private static readonly MethodInfo EnumToAsyncEnumSync = ToDelegate(EnumerableMapToAsyncEnumerableSync<int, int>)
         .Method.GetGenericMethodDefinition(); 
     
-    private static readonly Dictionary<(Type, Type, Type), MethodInfo> ConstructedSelectMethod = [];
+    private static readonly Dictionary<(Type, Type, Type, bool), MethodInfo> ConstructedSelectMethod = [];
 
-    public static MethodInfo ConstructSelectMethod(Type containerType, Type from, Type to)
+    public static MethodInfo ConstructSelectMethod(Type containerType, Type from, Type to, bool forceSync = false)
     {
         if (containerType.IsGenericType) containerType = containerType.GetGenericTypeDefinition();
         
-        if (!ConstructedSelectMethod.TryGetValue((containerType, from, to), out var method))
+        if (!ConstructedSelectMethod.TryGetValue((containerType, from, to, forceSync), out var method))
         {
             var isAsyncReturn = to.IsGenericType && (IsStable(typeof(Task<>), to) || IsStable(typeof(ValueTask<>), to));
             if (IsAllInterfaceStable(typeof(IAsyncEnumerable<>), containerType))
@@ -36,14 +37,18 @@ public static class ExprTreeHelper
             }
             else if (IsAllInterfaceStable(typeof(IEnumerable<>), containerType))
             {
-                method = isAsyncReturn ? EnumToAsyncEnumAsync.MakeGenericMethod(from, to) : EnumToAsyncEnumSync.MakeGenericMethod(from, to);
+                method = isAsyncReturn
+                    ? EnumToAsyncEnumAsync.MakeGenericMethod(from, to)
+                    : forceSync
+                        ? EnumerableToEnumerableSync.MakeGenericMethod(from, to)
+                        : EnumToAsyncEnumSync.MakeGenericMethod(from, to);
             }
             else
             {
                 method = EnumerableToEnumerableSync.MakeGenericMethod(from, to);
             }
             
-            ConstructedSelectMethod.Add((containerType, from, to), method);
+            ConstructedSelectMethod.Add((containerType, from, to, forceSync), method);
         }
 
         return method;
@@ -418,14 +423,14 @@ public static class ExprTreeHelper
         return JoinTypeParams(methodSignatures);
     }
 
-    private static bool IsGenericStable(Type target, Type? source)
+    public static bool IsGenericStable(Type target, Type? source)
     {
         if (source is null) return false;
         
         return source.IsGenericType
                && target.GetGenericTypeDefinition() == source.GetGenericTypeDefinition();
     }
-    
+
     private static bool IsAllInterfaceStable(Type target, Type? source)
     {
         return IsStable(target, source)
@@ -444,7 +449,7 @@ public static class ExprTreeHelper
         return target == source;
     }
     
-    private static Type? FindStableType(Type target, Type source)
+    public static Type? FindStableType(Type target, Type source)
     {
         if (IsStable(target, source)) return source;
 
@@ -540,6 +545,36 @@ public static class ExprTreeHelper
         return true;
     }
 
+    private static readonly MethodInfo EmptySequenceMethod = ToDelegate(Enumerable.Empty<int>).Method
+        .GetGenericMethodDefinition();
+
+    private static readonly MethodInfo EmptyAsyncSeqMethod = ToDelegate(AsyncEnumerable.Empty<int>).Method
+        .GetGenericMethodDefinition();
+
+    private static readonly Dictionary<Type, Func<object>> EmptySequenceCache = [];
+    public static object? MakeEmptyEnumerable(Type sequenceType)
+    {
+        if (!sequenceType.IsGenericType) return null;
+        
+        var genericType = sequenceType.GetGenericTypeDefinition();
+        var isSeq = genericType == typeof(IEnumerable<>);
+        var isAsyncSeq = genericType == typeof(IAsyncEnumerable<>);
+        if (!isSeq && !isAsyncSeq) return null;
+        
+        if (EmptySequenceCache.TryGetValue(sequenceType, out var lambda)) return lambda();
+                
+        var rawMethod = isAsyncSeq ? EmptyAsyncSeqMethod : EmptySequenceMethod;
+        var seqMethod = rawMethod.MakeGenericMethod(sequenceType.GetGenericArguments()[0]);
+        var callExpr = Expression.Call(null, seqMethod);
+        var objExpr = Expression.Convert(callExpr, typeof(object));
+        lambda = Expression.Lambda<Func<object>>(objExpr).Compile();
+        var result = lambda();
+        EmptySequenceCache.Add(sequenceType, lambda);
+
+        return result;
+
+    }
+
     public static (MethodCallExpression, string) BuildMethod(List<(MethodInfo, ConstantExpression?)> methods, IEnumerable<Type> parameters)
     {
         var parameterArray = parameters.ToList();
@@ -560,7 +595,8 @@ public static class ExprTreeHelper
 
             return (callExpr, GetSignatureOf(parameterArray));
         }
-        throw new MissingMethodException($"No method match argument signature {parameterArray}");
+
+        throw new NoMethodMatchedException(parameterArray, methods);
 
     }
 

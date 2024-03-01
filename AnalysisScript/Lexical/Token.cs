@@ -6,6 +6,17 @@ public interface IToken
     public int Pos { get; set; }
     public int Line { get; set; }
     public bool IsConstant { get; }
+
+    public string ToReadableString()
+    {
+        return this switch
+        {
+            IWordToken word => word.Word,
+            Token.Number number => $"{number.Real}",
+            Token.Integer integer => $"{integer.Value}",
+            _ => $"{Type}"
+        };
+    }
 }
 public interface IWordToken : IToken
 {

@@ -60,9 +60,11 @@ public static class LexicalAnalyzer
             }
             else if (current == '\n') yield return new Token.NewLine(pos, line);
             else if (char.IsWhiteSpace(current)) continue;
-            else if (char.IsNumber(current))
+            else if (current == '-' || char.IsNumber(current))
             {
-                var integer = current - '0';
+                var isMinus = current == '-';
+                var flag = isMinus ? -1 : 1;
+                var integer = isMinus ? 0 : current - '0';
                 while (HasMore() && char.IsNumber(Peek()))
                 {
                     integer *= 10;
@@ -80,12 +82,12 @@ public static class LexicalAnalyzer
                     }
 
                     if (!char.IsNumber(current)) Back();
-                    yield return new Token.Number(real, pos, line);
+                    yield return new Token.Number(flag * real, pos, line);
                 }
                 else
                 {
                     if (!char.IsNumber(current)) Back();
-                    yield return new Token.Integer(integer, pos, line);
+                    yield return new Token.Integer(flag * integer, pos, line);
                 }
             }
             else if (IsIdentityStart(current))
@@ -127,7 +129,8 @@ public static class LexicalAnalyzer
                             's' => ' ',
                             'b' => '\b',
                             'n' => '\n',
-                            _ => throw new InvalidTokenException(pos, $"\\{current}")
+                            '\\' => '\\',
+                            _ => throw new InvalidTokenException(pos, line, $"\\{current}")
                         };
                     }
                     else val += current;
@@ -146,7 +149,7 @@ public static class LexicalAnalyzer
                 yield return new Token.Comment(val, pos, line);
                 yield return new Token.NewLine(pos, ++line);
             }
-            else throw new InvalidTokenException(pos, current.ToString());
+            else throw new InvalidTokenException(pos, line, current.ToString());
         } while (HasMore());
 
         yield return new Token.NewLine(pos, ++line);
