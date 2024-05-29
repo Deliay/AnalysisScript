@@ -267,11 +267,13 @@ public static class BasicFunctionV2
 
     [AsMethod(Name = "group")]
     [AsMethod(Name = "distinct")]
+    [AsMethod(Name = "uniq")]
     public static IEnumerable<T> Group<T>(AsExecutionContext ctx, IEnumerable<T> values)
         => values.Distinct();
 
     [AsMethod(Name = "group")]
     [AsMethod(Name = "distinct")]
+    [AsMethod(Name = "uniq")]
     public static IAsyncEnumerable<T> Group<T>(AsExecutionContext ctx, IAsyncEnumerable<T> values)
         => values.Distinct();
 
@@ -412,7 +414,6 @@ public static class BasicFunctionV2
     {
         return seq.Append(item);
     }
-
 
     [AsMethod(Name = "json_node")]
     public static JsonNode? ToJsonNode(AsExecutionContext ctx, string obj)
@@ -573,6 +574,26 @@ public static class BasicFunctionV2
             .OfType<string>();
     }
 
+    [AsMethod(Name = "concat")]
+    [AsMethod(Name = "add")]
+    public static IEnumerable<T> Concat<T>(AsExecutionContext ctx, IEnumerable<T> first, IEnumerable<T> second)
+    {
+        return first.Concat(second);
+    }
+
+    [AsMethod(Name = "concat")]
+    [AsMethod(Name = "add")]
+    public static IAsyncEnumerable<T> ConcatAsync<T>(AsExecutionContext ctx, IAsyncEnumerable<T> first, IAsyncEnumerable<T> second)
+    {
+        return first.Concat(second);
+    }
+
+    [AsMethod(Name = "concat")]
+    [AsMethod(Name = "add")]
+    public static string Concat(AsExecutionContext ctx, string first, string second)
+    {
+        return first + second;
+    }
     
     public static AsInterpreter RegisterBasicFunctionsV2(this AsInterpreter interpreter)
     {

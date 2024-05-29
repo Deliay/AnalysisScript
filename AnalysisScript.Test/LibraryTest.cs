@@ -746,4 +746,23 @@ public class LibraryTest
         
         Assert.Equal("123456", Assert.Single(actual));
     }
+
+    [Fact]
+    public void TestConcat()
+    {
+        IEnumerable<int> first = [1];
+        var result = BasicFunctionV2.Concat(DefaultContext, first, [2]);
+        
+        Assert.Equal(3, result.Sum());
+    }
+
+    [Fact]
+    public async Task TestConcatAsync()
+    {
+        IEnumerable<int> first = [1];
+        IEnumerable<int> second = [2];
+        var result = BasicFunctionV2.ConcatAsync(DefaultContext, first.ToAsyncEnumerable(), second.ToAsyncEnumerable());
+        
+        Assert.Equal(3, await result.SumAsync());
+    }
 }
